@@ -1,0 +1,92 @@
+[
+  {
+    "size": "Nano",
+    "sha256": "f1309e91d626bc5ad5084a9bb07a8a2113f39cea15030031f78c41f95a0262bd",
+    "channels": 8,
+    "lmax": 2,
+    "radial_modes": 0,
+    "rcut": 6.0,
+    "precision": "float32",
+    "basis_type": "gaussian/fix",
+    "fitting_neuron": [
+      96,
+      96,
+      96
+    ],
+    "fitting_activation": "silu",
+    "type_count": 118,
+    "state_tensor_elements": 70442
+  },
+  {
+    "size": "Mini",
+    "sha256": "49a341ffb2aba4c37574416633ca193e67acddf1243df9607a5dc3a4a9fdacf0",
+    "channels": 32,
+    "lmax": 2,
+    "radial_modes": 0,
+    "rcut": 6.0,
+    "precision": "float32",
+    "basis_type": "gaussian/fix",
+    "fitting_neuron": [
+      192,
+      192,
+      192
+    ],
+    "fitting_activation": "silu",
+    "type_count": 118,
+    "state_tensor_elements": 262978
+  },
+  {
+    "size": "Neo",
+    "sha256": "42ca30abc081ce4b3105affac7ad5aabe63467e7b0a67e360e7d87a51ded3a26",
+    "channels": 64,
+    "lmax": 2,
+    "radial_modes": 0,
+    "rcut": 6.0,
+    "precision": "float32",
+    "basis_type": "gaussian/fix",
+    "fitting_neuron": [
+      256,
+      256,
+      256
+    ],
+    "fitting_activation": "silu",
+    "type_count": 118,
+    "state_tensor_elements": 542882
+  },
+  {
+    "size": "Air",
+    "sha256": "8029abfc5c4a7177101915c8a25338dc2bcae1b2ddf396c731a94b1b42c391c9",
+    "channels": 64,
+    "lmax": 3,
+    "radial_modes": 4,
+    "rcut": 6.0,
+    "precision": "float32",
+    "basis_type": "gaussian/fix",
+    "fitting_neuron": [
+      256,
+      256,
+      256
+    ],
+    "fitting_activation": "silu",
+    "type_count": 118,
+    "state_tensor_elements": 637690
+  },
+  {
+    "size": "Plus",
+    "sha256": "58b1e4e180e6c45a85d967c7b2b3ce52d76557b195ca6e66407bcd6a5b928360",
+    "channels": 128,
+    "lmax": 3,
+    "radial_modes": 4,
+    "rcut": 6.0,
+    "precision": "float32",
+    "basis_type": "gaussian/fix",
+    "fitting_neuron": [
+      384,
+      384,
+      384
+    ],
+    "fitting_activation": "silu",
+    "type_count": 118,
+    "state_tensor_elements": 1978114
+  }
+]

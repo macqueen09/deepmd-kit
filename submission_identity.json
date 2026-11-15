@@ -1,0 +1,12 @@
+{
+  "base_commit": "ba95134a1caa9fb658ccaa9f226ff54858f9246f",
+  "candidate_commit": "97411854d643eea6095a1ad68e5518c56b5864be",
+  "production_files": {
+    "deepmd/pt_expt/infer/deep_eval.py": "d1e2918d4709c7057d22a24a0609b5b5f75f56223510a7c8552ede814d0006cc",
+    "deepmd/pt_expt/utils/canonical_graph.py": "573becfe12bcef862c89fed1eb42afca0f427f71d7eacdd21bfd63076a813d36",
+    "deepmd/pt_expt/utils/vesin_graph_builder.py": "d146b03bdfd7137b5940c04f8759a8b379c8754d68175250ae8c72e22a59ab1a"
+  },
+  "fresh_cpu": "146 passed,29 skipped,45 subtests passed",
+  "fresh_cuda": "125 passed,no skips",
+  "private_reports_included": false
+}

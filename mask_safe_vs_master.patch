@@ -1,0 +1,393 @@
+diff --git a/deepmd/pt_expt/infer/deep_eval.py b/deepmd/pt_expt/infer/deep_eval.py
+index 43fd0e3..f7450d2 100644
+--- a/deepmd/pt_expt/infer/deep_eval.py
++++ b/deepmd/pt_expt/infer/deep_eval.py
+@@ -2626,8 +2626,20 @@ class DeepEval(DeepEvalBackend):
+             cc = torch.as_tensor(
+                 coord_input, dtype=torch.float64, device=builder_device
+             )
+-            aa = torch.as_tensor(
+-                np.asarray(atom_types), dtype=torch.int64, device=builder_device
++            # Direct canonical graphs only consume types when masking virtual
++            # atoms. The model input types are transferred by the caller.
++            skip_unused_types = (
++                method == "vesin"
++                and canonical
++                and pair_excl is None
++                and not (np.asarray(atom_types) < 0).any()
++            )
++            aa = (
++                None
++                if skip_unused_types
++                else torch.as_tensor(
++                    np.asarray(atom_types), dtype=torch.int64, device=builder_device
++                )
+             )
+             bb = (
+                 torch.as_tensor(box_input, dtype=torch.float64, device=builder_device)
+@@ -2659,9 +2671,7 @@ class DeepEval(DeepEvalBackend):
+                         bb.reshape(-1, 3, 3) if bb is not None else None,
+                         self._rcut,
+                         self._vesin_search,
+-                        node_mask=aa >= 0
+-                        if (np.asarray(atom_types) < 0).any()
+-                        else None,
++                        node_mask=aa >= 0 if aa is not None else None,
+                     )
+                 return build_neighbor_graph_vesin(
+                     cc,
+diff --git a/deepmd/pt_expt/utils/canonical_graph.py b/deepmd/pt_expt/utils/canonical_graph.py
+index c0597e6..3e5b5e7 100644
+--- a/deepmd/pt_expt/utils/canonical_graph.py
++++ b/deepmd/pt_expt/utils/canonical_graph.py
+@@ -402,13 +402,19 @@ def canonical_graph_from_pairs(
+         All nodes are local; no coordinate differentiation is required.
+     """
+     edge_count = source.shape[0]
+-    destination_order = torch.argsort(center, stable=True)
++    # Valid node ids fit signed int32 up through node_count == 2**31.
++    # Keep the public indices and permutation int64; narrow only radix keys.
++    destination_key = center.to(torch.int32) if node_count <= 2**31 else center
++    destination_order = torch.argsort(destination_key, stable=True)
++    del destination_key
+     center = center.index_select(0, destination_order)
+     source = source.index_select(0, destination_order)
+     edge_vec = edge_vec.index_select(0, destination_order).to(torch.float32)
+     boundaries = torch.arange(node_count + 1, dtype=torch.int64, device=source.device)
+     destination_row_ptr = torch.searchsorted(center, boundaries)
+-    source_order = torch.argsort(source, stable=True)
++    source_key = source.to(torch.int32) if node_count <= 2**31 else source
++    source_order = torch.argsort(source_key, stable=True)
++    del source_key
+     source_row_ptr = torch.searchsorted(
+         source.index_select(0, source_order), boundaries
+     )
+diff --git a/deepmd/pt_expt/utils/vesin_graph_builder.py b/deepmd/pt_expt/utils/vesin_graph_builder.py
+index 9e9b73d..8044694 100644
+--- a/deepmd/pt_expt/utils/vesin_graph_builder.py
++++ b/deepmd/pt_expt/utils/vesin_graph_builder.py
+@@ -248,6 +248,10 @@ def build_canonical_graph_vesin(
+             center = center.index_select(0, indices)
+             source = source.index_select(0, indices)
+             edge_vec = edge_vec.index_select(0, indices)
++        # Deployment consumes FP32 geometry. Narrow after filtering but before
++        # concatenation/sorting, so neither discarded edges nor a sorted FP64
++        # copy need a separate conversion in canonical_graph_from_pairs.
++        edge_vec = edge_vec.to(torch.float32)
+         if frame:
+             center = center + frame * nloc
+             source = source + frame * nloc
+diff --git a/source/tests/pt_expt/utils/test_canonical_graph.py b/source/tests/pt_expt/utils/test_canonical_graph.py
+index 3563912..215408f 100644
+--- a/source/tests/pt_expt/utils/test_canonical_graph.py
++++ b/source/tests/pt_expt/utils/test_canonical_graph.py
+@@ -190,18 +190,64 @@ def test_edge_storage_range_is_independent_of_node_width(
+ def test_pairs_choose_width_from_node_extent(
+     node_count: int, expected_dtype: torch.dtype
+ ) -> None:
+-    graph = canonical_graph_from_pairs(
+-        torch.empty(2, dtype=torch.int64, device="meta"),
+-        torch.empty(2, dtype=torch.int64, device="meta"),
+-        torch.empty(2, 3, dtype=torch.float32, device="meta"),
+-        torch.empty(1, dtype=torch.int64, device="meta"),
+-        node_count,
++    # Meta tensors check the 2**31 boundary without allocating a giant CSR.
++    with mock.patch.object(torch, "argsort", wraps=torch.argsort) as argsort:
++        graph = canonical_graph_from_pairs(
++            torch.empty(2, dtype=torch.int64, device="meta"),
++            torch.empty(2, dtype=torch.int64, device="meta"),
++            torch.empty(2, 3, dtype=torch.float32, device="meta"),
++            torch.empty(1, dtype=torch.int64, device="meta"),
++            node_count,
++        )
++    expected_key_dtype = torch.int32 if node_count <= INT32_MAX + 1 else torch.int64
++    assert len(argsort.call_args_list) == 2
++    assert all(
++        call.args[0].dtype == expected_key_dtype for call in argsort.call_args_list
+     )
+     assert graph.source.dtype == expected_dtype
+     assert graph.source_order.dtype == torch.int64
+     validate_canonical_graph_shapes(graph, node_count)
+ 
+ 
++@pytest.mark.parametrize("device", ["cpu", "cuda"])
++@pytest.mark.parametrize("edge_count", [0, 1, 2, 6])
++@pytest.mark.parametrize("strided", [False, True])
++def test_pairs_keep_stable_ties_and_int64_permutations(
++    device: str, edge_count: int, strided: bool
++) -> None:
++    if device == "cuda" and not torch.cuda.is_available():
++        pytest.skip("CUDA is required")
++    center = torch.tensor([3, 1, 1, 3, 0, 1], device=device)[:edge_count]
++    source = torch.tensor([2, 2, 2, 0, 1, 2], device=device)[:edge_count]
++    if strided:
++        center = torch.stack((center, center), dim=1)[:, 0]
++        source = torch.stack((source, source), dim=1)[:, 0]
++    vector = torch.arange(edge_count * 3, dtype=torch.float64, device=device).reshape(
++        -1, 3
++    )
++    order = torch.argsort(center, stable=True)
++    sorted_source = source.index_select(0, order)
++    source_order = torch.argsort(sorted_source, stable=True)
++    graph = canonical_graph_from_pairs(
++        center, source, vector, torch.tensor([2, 2], device=device), 4
++    )
++    assert graph.source_order.dtype == torch.int64
++    assert torch.equal(graph.source[:edge_count].to(torch.int64), sorted_source)
++    assert torch.equal(
++        graph.edge_vec[:edge_count], vector.index_select(0, order).float()
++    )
++    assert torch.equal(graph.source_order[:edge_count], source_order)
++    boundaries = torch.arange(5, device=device)
++    assert torch.equal(
++        graph.destination_row_ptr,
++        torch.searchsorted(center.index_select(0, order), boundaries),
++    )
++    assert torch.equal(
++        graph.source_row_ptr,
++        torch.searchsorted(sorted_source.index_select(0, source_order), boundaries),
++    )
++
++
+ @pytest.mark.parametrize("dtype", [torch.uint32, torch.int32, torch.int64])
+ def test_index_byte_carrier_preserves_words_without_copy(dtype: torch.dtype) -> None:
+     values = [0, 7, (1 << 40) + 123] if dtype == torch.int64 else [0, 7, INT32_MAX]
+diff --git a/source/tests/pt_expt/utils/test_vesin_graph_builder.py b/source/tests/pt_expt/utils/test_vesin_graph_builder.py
+index 57d1acf..bf93cb6 100644
+--- a/source/tests/pt_expt/utils/test_vesin_graph_builder.py
++++ b/source/tests/pt_expt/utils/test_vesin_graph_builder.py
+@@ -5,6 +5,7 @@ from dataclasses import (
+ from unittest import (
+     mock,
+ )
++import weakref
+ 
+ import numpy as np
+ import pytest
+@@ -18,6 +19,7 @@ from deepmd.dpmodel.utils.neighbor_graph import (
+     build_neighbor_graph,
+ )
+ from deepmd.pt_expt.utils.canonical_graph import (
++    canonical_graph_from_pairs,
+     canonical_graph_from_neighbor_graph,
+     validate_canonical_graph_shapes,
+ )
+@@ -39,6 +41,67 @@ pytestmark = pytest.mark.skipif(
+ )
+ 
+ 
++@pytest.mark.parametrize("edge_count", [0, 1, 7])
++@pytest.mark.parametrize("frames", [1, 2])
++@pytest.mark.parametrize("masked", [False, True])
++def test_canonical_search_geometry_is_narrowed_before_sort(
++    edge_count: int, frames: int, masked: bool
++) -> None:
++    """The same deployed FP32 values need not keep search FP64 storage alive."""
++    nloc = 4
++    old_geometry = []
++
++    def frame_data(frame):
++        idx = torch.arange(edge_count)
++        center = (2 * idx + frame) % nloc
++        source = (idx + 1) % nloc
++        center = torch.stack((center, center), dim=1)[:, 0]
++        source = torch.stack((source, source), dim=1)[:, 0]
++        vector = torch.tensor([-0.0, 1.0 + 2**-24, 1e-44], dtype=torch.float64)
++        return center, source, vector.repeat(edge_count, 2)[:, ::2]
++
++    class FreshSearch:
++        def compute(self, positions, cell, rcut, *, frame, return_vectors):
++            assert positions.dtype == torch.float64 and return_vectors
++            center, source, vector = frame_data(frame)
++            old_geometry.append(weakref.ref(vector))
++            return center, source, vector
++
++    coord = torch.zeros(frames, nloc, 3, dtype=torch.float64)
++    mask = torch.tensor([[True, False, True, True]] * frames) if masked else None
++    centers, sources, vectors = [], [], []
++    for frame in range(frames):
++        center, source, vector = frame_data(frame)
++        if mask is not None:
++            active = mask[frame, center] & mask[frame, source]
++            center, source, vector = center[active], source[active], vector[active]
++        centers.append(center + frame * nloc)
++        sources.append(source + frame * nloc)
++        vectors.append(vector)
++    expected = canonical_graph_from_pairs(
++        torch.cat(centers),
++        torch.cat(sources),
++        torch.cat(vectors),
++        torch.full((frames,), nloc),
++        frames * nloc,
++    )
++    original = vesin_builder.canonical_graph_from_pairs
++
++    def inspect(center, source, vector, *args):
++        assert vector.dtype == torch.float32
++        assert all(reference() is None for reference in old_geometry)
++        return original(center, source, vector, *args)
++
++    with mock.patch.object(vesin_builder, "canonical_graph_from_pairs", inspect):
++        actual = vesin_builder.build_canonical_graph_vesin(
++            coord, None, 3.0, FreshSearch(), node_mask=mask
++        )
++    for field in expected.__dataclass_fields__:
++        before, after = getattr(expected, field), getattr(actual, field)
++        assert before.shape == after.shape and before.dtype == after.dtype
++        assert torch.equal(before.view(torch.uint8), after.view(torch.uint8)), field
++
++
+ def _sets(ng, nloc):
+     """Per-center set of (src_local, rounded edge_vec) over real edges."""
+     ei = np.asarray(ng.edge_index)
+diff --git a/source/tests/pt_expt/infer/test_canonical_input_types.py b/source/tests/pt_expt/infer/test_canonical_input_types.py
+new file mode 100644
+index 0000000..68857c3
+--- /dev/null
++++ b/source/tests/pt_expt/infer/test_canonical_input_types.py
+@@ -0,0 +1,145 @@
++# SPDX-License-Identifier: LGPL-3.0-or-later
++"""Do not transfer unused types to the direct canonical Vesin builder."""
++
++from unittest.mock import patch
++
++import numpy as np
++import pytest
++import torch
++from deepmd.pt_expt.infer.deep_eval import DeepEval
++
++
++def make_evaluator(method):
++    evaluator = object.__new__(DeepEval)
++    evaluator._neighbor_graph_method = method
++    evaluator._rcut = 3.0
++    evaluator._vesin_search = object()
++    evaluator.metadata = {"graph_edge_dtype": "float32"}
++    return evaluator
++
++
++@pytest.mark.parametrize("dtype", [np.int32, np.int64])
++@pytest.mark.parametrize(
++    "case",
++    [
++        "ordinary",
++        "virtual",
++        "empty",
++        "strided",
++        "broadcast",
++        "readonly",
++        "list",
++        "cpu_tensor",
++        "virtual_cpu_tensor",
++    ],
++)
++def test_direct_canonical_only_transfers_consumed_types(dtype, case):
++    n = 0 if case == "empty" else 4
++    atom_types = np.zeros((1, n), dtype=dtype)
++    if case in ("virtual", "virtual_cpu_tensor"):
++        atom_types[0, -1] = -1
++    elif case == "strided":
++        atom_types = np.zeros((1, 2 * n), dtype=dtype)[:, ::2]
++    elif case == "broadcast":
++        atom_types = np.broadcast_to(np.array([[1]], dtype=dtype), (1, n))
++    elif case == "readonly":
++        atom_types.flags.writeable = False
++    elif case == "list":
++        atom_types = atom_types.tolist()
++    if case in ("cpu_tensor", "virtual_cpu_tensor"):
++        atom_types = torch.from_numpy(atom_types)
++    before = np.asarray(atom_types).copy()
++    evaluator = make_evaluator("vesin")
++    transfers = []
++    original = torch.as_tensor
++
++    def record(value, *args, **kwargs):
++        if kwargs.get("dtype") == torch.int64:
++            transfers.append(np.array(value, copy=True))
++        return original(value, *args, **kwargs)
++
++    with (
++        patch.object(DeepEval, "_model_pair_excl", return_value=None),
++        patch("torch.as_tensor", side_effect=record),
++        patch(
++            "deepmd.pt_expt.utils.vesin_graph_builder.build_canonical_graph_vesin"
++        ) as builder,
++    ):
++        result = evaluator._build_eval_graph(
++            np.zeros((1, n, 3)), atom_types, None, torch.device("cpu"), canonical=True
++        )
++    assert result is builder.return_value
++    if case in ("virtual", "virtual_cpu_tensor"):
++        assert len(transfers) == 1
++        np.testing.assert_array_equal(transfers[0], before)
++        assert torch.equal(
++            builder.call_args.kwargs["node_mask"], torch.tensor(before >= 0)
++        )
++    else:
++        assert not transfers
++        assert builder.call_args.kwargs["node_mask"] is None
++    np.testing.assert_array_equal(atom_types, before)
++
++
++@pytest.mark.parametrize(
++    "canonical,excluded", [(False, False), (False, True), (True, True)]
++)
++def test_generic_or_excluded_vesin_still_receives_types(canonical, excluded):
++    evaluator = make_evaluator("vesin")
++    atom_types = np.array([[0, 1, -1]], dtype=np.int32)
++    exclusion = object() if excluded else None
++    with (
++        patch.object(DeepEval, "_model_pair_excl", return_value=exclusion),
++        patch(
++            "deepmd.pt_expt.utils.vesin_graph_builder.build_neighbor_graph_vesin"
++        ) as builder,
++    ):
++        evaluator._build_eval_graph(
++            np.zeros((1, 3, 3)),
++            atom_types,
++            None,
++            torch.device("cpu"),
++            canonical=canonical,
++        )
++    assert builder.call_args.args[1].dtype == torch.int64
++    assert torch.equal(
++        builder.call_args.args[1], torch.tensor(atom_types, dtype=torch.int64)
++    )
++    assert builder.call_args.kwargs["pair_excl"] is exclusion
++
++
++@pytest.mark.parametrize("method", ["cell", "nv"])
++@pytest.mark.parametrize("canonical", [False, True])
++def test_other_device_builders_still_receive_types(method, canonical):
++    evaluator = make_evaluator(method)
++    atom_types = np.array([[0, 1, 0], [1, 0, 1]], dtype=np.int64)
++    target = (
++        f"deepmd.pt_expt.utils.{method}_graph_builder.build_neighbor_graph_{method}"
++    )
++    with (
++        patch.object(DeepEval, "_model_pair_excl", return_value=None),
++        patch(target) as builder,
++    ):
++        evaluator._build_eval_graph(
++            np.zeros((2, 3, 3)),
++            atom_types,
++            None,
++            torch.device("cpu"),
++            canonical=canonical,
++        )
++    assert torch.equal(builder.call_args.args[1], torch.tensor(atom_types))
++
++
++def test_single_frame_fused_cell_keeps_its_type_input():
++    evaluator = make_evaluator("cell")
++    atom_types = np.array([[0, 1, 0]], dtype=np.int64)
++    with (
++        patch.object(DeepEval, "_model_pair_excl", return_value=None),
++        patch(
++            "deepmd.pt_expt.utils.cell_graph_builder.build_neighbor_graph_fused"
++        ) as builder,
++    ):
++        evaluator._build_eval_graph(
++            np.zeros((1, 3, 3)), atom_types, None, torch.device("cpu"), canonical=True
++        )
++    assert torch.equal(builder.call_args.args[1], torch.tensor(atom_types.reshape(-1)))

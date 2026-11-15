@@ -1,0 +1,1637 @@
+{
+  "base": "C01 3f962a6bb842ac8e4aa0ae1f4228d7168df5c1f3 (not unmodified master)",
+  "native_sha256": "6f8916e565b91612469bb09114e3ca17eb4a5438d130556daf2b88a2706adced",
+  "gpu": 1,
+  "groups": {
+    "combo/Neo/4096": {
+      "kind": "combo",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-combo-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-combo-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 1.6654391579321137,
+            "p90_ms": 1.8924047812330147,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5003480948507786,
+              "p90_ms": 1.516148867085576,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4753607101738453,
+              "p90_ms": 1.4874571934342384,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.5697518947044607
+        },
+        {
+          "tag": "r3m-combo-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-combo-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 2.824801712457903,
+            "p90_ms": 3.786577580356143,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5196294989436865,
+              "p90_ms": 1.6417492181062698,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4767029788345098,
+              "p90_ms": 1.5795831102877855,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.47011122159732965
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo4096-AB-r2-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-AB-r2-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 1.9053432468801756,
+            "p90_ms": 1.8838953054954977,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.4994158409535885,
+              "p90_ms": 1.51096205227077,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4708468224853277,
+              "p90_ms": 1.4824971091002226,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.5606970956147821
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo4096-AB-r4-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-AB-r4-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 1.9155419304856314,
+            "p90_ms": 1.7683859348578634,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.504766521975398,
+              "p90_ms": 1.5188409946858883,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.475942088291049,
+              "p90_ms": 1.4919820241630077,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.5479933692116584
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo4096-BA-r3-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-BA-r3-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 2.280341510861339,
+            "p90_ms": 2.5349255671411774,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5059129800647497,
+              "p90_ms": 1.5241109766066074,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4715730212628841,
+              "p90_ms": 1.4854758977890015,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.5670478031854627
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo4096-BA-r5-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-BA-r5-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 2.3260074107312234,
+            "p90_ms": 5.3359528006780454,
+            "peak_allocated_MiB": 27.40049896564285,
+            "first_allocated_MiB": 27.40049896564285
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5099509619176388,
+              "p90_ms": 1.5766491647809744,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4748293906450272,
+              "p90_ms": 1.492519909515977,
+              "peak_allocated_MiB": 51.57861328125,
+              "peak_reserved_MiB": 62.0,
+              "first_allocated_MiB": 51.57861328125,
+              "first_reserved_MiB": 62.0
+            }
+          },
+          "max_elementwise_ratio": 0.6153563002617853
+        }
+      ],
+      "pairs": 6,
+      "strict_pass": 6,
+      "faster": 6,
+      "paired_p50_reduction_percent": 2.097941720673485,
+      "range_p50_reduction_percent": [
+        1.6654391579321137,
+        2.824801712457903
+      ],
+      "max_elementwise_ratio": 0.6153563002617853,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.505339751020074,
+          "p90_ms": 1.5214759856462479,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.4750950504094362,
+          "p90_ms": 1.489719608798623,
+          "peak_allocated_MiB": 51.57861328125,
+          "peak_reserved_MiB": 62.0,
+          "first_allocated_MiB": 51.57861328125,
+          "first_reserved_MiB": 62.0
+        }
+      },
+      "paired_bootstrap_95ci_percent": [
+        1.7853912024061447,
+        2.575404561594563
+      ]
+    },
+    "combo/Neo/1000": {
+      "kind": "combo",
+      "size": "Neo",
+      "natoms": 1000,
+      "trials": [
+        {
+          "tag": "r3m-confirm-combo-Neo1000-AB-r0-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo1000-AB-r0-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 2.6886326802370464,
+            "p90_ms": 2.4263441291447196,
+            "peak_allocated_MiB": 19.804705551425528,
+            "first_allocated_MiB": 19.804705551425528
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.135639613494277,
+              "p90_ms": 1.1506670154631138,
+              "peak_allocated_MiB": 24.30224609375,
+              "peak_reserved_MiB": 48.0,
+              "first_allocated_MiB": 24.30224609375,
+              "first_reserved_MiB": 48.0
+            },
+            "candidate": {
+              "p50_ms": 1.1051064357161522,
+              "p90_ms": 1.1227478738874197,
+              "peak_allocated_MiB": 19.4892578125,
+              "peak_reserved_MiB": 28.0,
+              "first_allocated_MiB": 19.4892578125,
+              "first_reserved_MiB": 28.0
+            }
+          },
+          "max_elementwise_ratio": 0.3710776374136413
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo1000-BA-r1-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo1000-BA-r1-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 3.8301929435331394,
+            "p90_ms": 3.8242821268732463,
+            "peak_allocated_MiB": 19.804705551425528,
+            "first_allocated_MiB": 19.804705551425528
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.1455724015831947,
+              "p90_ms": 1.1631200090050697,
+              "peak_allocated_MiB": 24.30224609375,
+              "peak_reserved_MiB": 48.0,
+              "first_allocated_MiB": 24.30224609375,
+              "first_reserved_MiB": 48.0
+            },
+            "candidate": {
+              "p50_ms": 1.101694768294692,
+              "p90_ms": 1.1186390183866024,
+              "peak_allocated_MiB": 19.4892578125,
+              "peak_reserved_MiB": 28.0,
+              "first_allocated_MiB": 19.4892578125,
+              "first_reserved_MiB": 28.0
+            }
+          },
+          "max_elementwise_ratio": 0.5399830797785421
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 2,
+      "paired_p50_reduction_percent": 3.2594128118850927,
+      "range_p50_reduction_percent": [
+        2.6886326802370464,
+        3.8301929435331394
+      ],
+      "max_elementwise_ratio": 0.5399830797785421,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.1406060075387359,
+          "p90_ms": 1.1568935122340918,
+          "peak_allocated_MiB": 24.30224609375,
+          "peak_reserved_MiB": 48.0,
+          "first_allocated_MiB": 24.30224609375,
+          "first_reserved_MiB": 48.0
+        },
+        "candidate": {
+          "p50_ms": 1.1034006020054221,
+          "p90_ms": 1.120693446137011,
+          "peak_allocated_MiB": 19.4892578125,
+          "peak_reserved_MiB": 28.0,
+          "first_allocated_MiB": 19.4892578125,
+          "first_reserved_MiB": 28.0
+        }
+      }
+    },
+    "combo/Neo/8000": {
+      "kind": "combo",
+      "size": "Neo",
+      "natoms": 8000,
+      "trials": [
+        {
+          "tag": "r3m-confirm-combo-Neo8000-AB-r0-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo8000-AB-r0-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 3.3645850455447213,
+            "p90_ms": 3.2902570700163003,
+            "peak_allocated_MiB": 29.84729137251988,
+            "first_allocated_MiB": 29.84729137251988
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.8499274738132954,
+              "p90_ms": 1.8639021553099155,
+              "peak_allocated_MiB": 131.416015625,
+              "peak_reserved_MiB": 166.0,
+              "first_allocated_MiB": 131.416015625,
+              "first_reserved_MiB": 166.0
+            },
+            "candidate": {
+              "p50_ms": 1.78768509067595,
+              "p90_ms": 1.8025749828666449,
+              "peak_allocated_MiB": 92.19189453125,
+              "peak_reserved_MiB": 132.0,
+              "first_allocated_MiB": 92.19189453125,
+              "first_reserved_MiB": 132.0
+            }
+          },
+          "max_elementwise_ratio": 0.5245559726091815
+        },
+        {
+          "tag": "r3m-confirm-combo-Neo8000-BA-r1-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo8000-BA-r1-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 3.334850137938361,
+            "p90_ms": 3.077567432361239,
+            "peak_allocated_MiB": 29.84729137251988,
+            "first_allocated_MiB": 29.84729137251988
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.8450790084898472,
+              "p90_ms": 1.8556138966232538,
+              "peak_allocated_MiB": 131.416015625,
+              "peak_reserved_MiB": 166.0,
+              "first_allocated_MiB": 131.416015625,
+              "first_reserved_MiB": 166.0
+            },
+            "candidate": {
+              "p50_ms": 1.7835483886301517,
+              "p90_ms": 1.7985061276704073,
+              "peak_allocated_MiB": 92.19189453125,
+              "peak_reserved_MiB": 132.0,
+              "first_allocated_MiB": 92.19189453125,
+              "first_reserved_MiB": 132.0
+            }
+          },
+          "max_elementwise_ratio": 0.5739349352010017
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 2,
+      "paired_p50_reduction_percent": 3.349717591741541,
+      "range_p50_reduction_percent": [
+        3.334850137938361,
+        3.3645850455447213
+      ],
+      "max_elementwise_ratio": 0.5739349352010017,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.8475032411515713,
+          "p90_ms": 1.8597580259665847,
+          "peak_allocated_MiB": 131.416015625,
+          "peak_reserved_MiB": 166.0,
+          "first_allocated_MiB": 131.416015625,
+          "first_reserved_MiB": 166.0
+        },
+        "candidate": {
+          "p50_ms": 1.785616739653051,
+          "p90_ms": 1.800540555268526,
+          "peak_allocated_MiB": 92.19189453125,
+          "peak_reserved_MiB": 132.0,
+          "first_allocated_MiB": 92.19189453125,
+          "first_reserved_MiB": 132.0
+        }
+      }
+    },
+    "combo/Plus/4096": {
+      "kind": "combo",
+      "size": "Plus",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-confirm-combo-Plus4096-AB-r0-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Plus4096-AB-r0-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 1.7599388375954983,
+            "p90_ms": 1.7130842820486825,
+            "peak_allocated_MiB": 17.426271108442503,
+            "first_allocated_MiB": 17.300047772026627
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 2.1908669732511044,
+              "p90_ms": 2.2016132716089487,
+              "peak_allocated_MiB": 111.40966796875,
+              "peak_reserved_MiB": 136.0,
+              "first_allocated_MiB": 111.40966796875,
+              "first_reserved_MiB": 136.0
+            },
+            "candidate": {
+              "p50_ms": 2.1523090545088053,
+              "p90_ms": 2.163897780701518,
+              "peak_allocated_MiB": 91.9951171875,
+              "peak_reserved_MiB": 144.0,
+              "first_allocated_MiB": 92.1357421875,
+              "first_reserved_MiB": 144.0
+            }
+          },
+          "max_elementwise_ratio": 0.5425705554903641
+        },
+        {
+          "tag": "r3m-confirm-combo-Plus4096-BA-r1-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Plus4096-BA-r1-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 1.2859985793641227,
+            "p90_ms": 0.6769538608583647,
+            "peak_allocated_MiB": 17.426271108442503,
+            "first_allocated_MiB": 17.300047772026627
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 2.197789726778865,
+              "p90_ms": 2.2822328843176365,
+              "peak_allocated_MiB": 111.40966796875,
+              "peak_reserved_MiB": 136.0,
+              "first_allocated_MiB": 111.40966796875,
+              "first_reserved_MiB": 136.0
+            },
+            "candidate": {
+              "p50_ms": 2.169526182115078,
+              "p90_ms": 2.266783220693469,
+              "peak_allocated_MiB": 91.9951171875,
+              "peak_reserved_MiB": 144.0,
+              "first_allocated_MiB": 92.1357421875,
+              "first_reserved_MiB": 144.0
+            }
+          },
+          "max_elementwise_ratio": 0.8616621736607887
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 2,
+      "paired_p50_reduction_percent": 1.5229687084798105,
+      "range_p50_reduction_percent": [
+        1.2859985793641227,
+        1.7599388375954983
+      ],
+      "max_elementwise_ratio": 0.8616621736607887,
+      "arms": {
+        "baseline": {
+          "p50_ms": 2.1943283500149846,
+          "p90_ms": 2.2419230779632926,
+          "peak_allocated_MiB": 111.40966796875,
+          "peak_reserved_MiB": 136.0,
+          "first_allocated_MiB": 111.40966796875,
+          "first_reserved_MiB": 136.0
+        },
+        "candidate": {
+          "p50_ms": 2.1609176183119416,
+          "p90_ms": 2.2153405006974936,
+          "peak_allocated_MiB": 91.9951171875,
+          "peak_reserved_MiB": 144.0,
+          "first_allocated_MiB": 92.1357421875,
+          "first_reserved_MiB": 144.0
+        }
+      }
+    },
+    "csr/Neo/4096": {
+      "kind": "csr",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-csr-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-csr-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": -0.9871070764172485,
+            "p90_ms": -1.4091923185178157,
+            "peak_allocated_MiB": 6.9051071813939435,
+            "first_allocated_MiB": 6.9051071813939435
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5270335134118795,
+              "p90_ms": 1.541102072224021,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.542106969282031,
+              "p90_ms": 1.5628191642463207,
+              "peak_allocated_MiB": 66.1396484375,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 66.1396484375,
+              "first_reserved_MiB": 90.0
+            }
+          },
+          "max_elementwise_ratio": 0.5989875782704173
+        },
+        {
+          "tag": "r3m-csr-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-csr-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": -3.4037939641507586,
+            "p90_ms": -3.3655024648878262,
+            "peak_allocated_MiB": 6.9051071813939435,
+            "first_allocated_MiB": 6.9051071813939435
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5049814246594906,
+              "p90_ms": 1.5182193368673325,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.5562078915536404,
+              "p90_ms": 1.5693150460720062,
+              "peak_allocated_MiB": 66.1396484375,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 66.1396484375,
+              "first_reserved_MiB": 90.0
+            }
+          },
+          "max_elementwise_ratio": 0.4580434337614879
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 0,
+      "paired_p50_reduction_percent": -2.1954505202840036,
+      "range_p50_reduction_percent": [
+        -3.4037939641507586,
+        -0.9871070764172485
+      ],
+      "max_elementwise_ratio": 0.5989875782704173,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.516007469035685,
+          "p90_ms": 1.5296607045456767,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.5491574304178357,
+          "p90_ms": 1.5660671051591635,
+          "peak_allocated_MiB": 66.1396484375,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 66.1396484375,
+          "first_reserved_MiB": 90.0
+        }
+      }
+    },
+    "early-f32/Neo/4096": {
+      "kind": "early-f32",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-early-f32-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-early-f32-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": -1.0594535701111019,
+            "p90_ms": -1.2558608244991776,
+            "peak_allocated_MiB": 19.588868805025395,
+            "first_allocated_MiB": 19.588868805025395
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.4933240599930286,
+              "p90_ms": 1.5008710324764252,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.5091451350599527,
+              "p90_ms": 1.519719883799553,
+              "peak_allocated_MiB": 57.12841796875,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 57.12841796875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.6145851025126988
+        },
+        {
+          "tag": "r3m-early-f32-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-early-f32-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": -0.5788483864340055,
+            "p90_ms": -0.8107747158082601,
+            "peak_allocated_MiB": 19.588868805025395,
+            "first_allocated_MiB": 19.588868805025395
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5049465000629425,
+              "p90_ms": 1.5156920533627272,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.513657858595252,
+              "p90_ms": 1.5279809013009071,
+              "peak_allocated_MiB": 57.12841796875,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 57.12841796875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.584120516188687
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 0,
+      "paired_p50_reduction_percent": -0.8191509782725537,
+      "range_p50_reduction_percent": [
+        -1.0594535701111019,
+        -0.5788483864340055
+      ],
+      "max_elementwise_ratio": 0.6145851025126988,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.4991352800279856,
+          "p90_ms": 1.5082815429195762,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.5114014968276024,
+          "p90_ms": 1.52385039255023,
+          "peak_allocated_MiB": 57.12841796875,
+          "peak_reserved_MiB": 74.0,
+          "first_allocated_MiB": 57.12841796875,
+          "first_reserved_MiB": 74.0
+        }
+      }
+    },
+    "gather/Neo/4096": {
+      "kind": "gather",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-gather-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-gather-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": -1.2873638809982157,
+            "p90_ms": -1.573812466754454,
+            "peak_allocated_MiB": 10.0727830049278,
+            "first_allocated_MiB": 9.856289647493831
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.4996964018791914,
+              "p90_ms": 1.5129019506275654,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.519002951681614,
+              "p90_ms": 1.5367121901363134,
+              "peak_allocated_MiB": 63.88916015625,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 64.04296875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.5127944377322003
+        },
+        {
+          "tag": "r3m-gather-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-gather-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": -0.3583123270492816,
+            "p90_ms": 9.968520975875606,
+            "peak_allocated_MiB": 10.0727830049278,
+            "first_allocated_MiB": 9.856289647493831
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5209822449833155,
+              "p90_ms": 1.7105594743043184,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.5264321118593216,
+              "p90_ms": 1.540041994303465,
+              "peak_allocated_MiB": 63.88916015625,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 64.04296875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.5769192689987178
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 0,
+      "paired_p50_reduction_percent": -0.8228381040237487,
+      "range_p50_reduction_percent": [
+        -1.2873638809982157,
+        -0.3583123270492816
+      ],
+      "max_elementwise_ratio": 0.5769192689987178,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.5103393234312534,
+          "p90_ms": 1.611730712465942,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.5227175317704678,
+          "p90_ms": 1.5383770922198892,
+          "peak_allocated_MiB": 63.88916015625,
+          "peak_reserved_MiB": 74.0,
+          "first_allocated_MiB": 64.04296875,
+          "first_reserved_MiB": 74.0
+        }
+      }
+    },
+    "host_geo/Neo/4096": {
+      "kind": "host_geo",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-host_geo-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-host_geo-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": 1.428769188958201,
+            "p90_ms": 1.2472703187134448,
+            "peak_allocated_MiB": 19.632854757011977,
+            "first_allocated_MiB": 19.632854757011977
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.50867342017591,
+              "p90_ms": 1.5218709129840136,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4871179591864347,
+              "p90_ms": 1.5028890687972307,
+              "peak_allocated_MiB": 57.09716796875,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 57.09716796875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.5137293209350611
+        },
+        {
+          "tag": "r3m-host_geo-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-host_geo-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 0.9737615726252535,
+            "p90_ms": 1.1048549783539863,
+            "peak_allocated_MiB": 19.632854757011977,
+            "first_allocated_MiB": 19.632854757011977
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.50473159737885,
+              "p90_ms": 1.5215298626571894,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.4900790993124247,
+              "p90_ms": 1.5047191642224789,
+              "peak_allocated_MiB": 57.09716796875,
+              "peak_reserved_MiB": 74.0,
+              "first_allocated_MiB": 57.09716796875,
+              "first_reserved_MiB": 74.0
+            }
+          },
+          "max_elementwise_ratio": 0.533421368742614
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 2,
+      "paired_p50_reduction_percent": 1.2012653807917273,
+      "range_p50_reduction_percent": [
+        0.9737615726252535,
+        1.428769188958201
+      ],
+      "max_elementwise_ratio": 0.533421368742614,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.50670250877738,
+          "p90_ms": 1.5217003878206015,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.4885985292494297,
+          "p90_ms": 1.5038041165098548,
+          "peak_allocated_MiB": 57.09716796875,
+          "peak_reserved_MiB": 74.0,
+          "first_allocated_MiB": 57.09716796875,
+          "first_reserved_MiB": 74.0
+        }
+      }
+    },
+    "single_runner/Neo/4096": {
+      "kind": "single_runner",
+      "size": "Neo",
+      "natoms": 4096,
+      "trials": [
+        {
+          "tag": "r3m-single_runner-Neo4096-AB-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-single_runner-Neo4096-AB-20261113/summary.json",
+          "order": "AB",
+          "reductions_percent": {
+            "p50_ms": -0.17381422296778304,
+            "p90_ms": -0.23400824403341236,
+            "peak_allocated_MiB": 0.0,
+            "first_allocated_MiB": 0.0
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.5017553232610226,
+              "p90_ms": 1.5162511728703976,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.504365587607026,
+              "p90_ms": 1.5197993256151676,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            }
+          },
+          "max_elementwise_ratio": 0.8358685906153168
+        },
+        {
+          "tag": "r3m-single_runner-Neo4096-BA-20261113",
+          "status": "PASS",
+          "path": "${REPRO_ROOT}/results/r3m-single_runner-Neo4096-BA-20261113/summary.json",
+          "order": "BA",
+          "reductions_percent": {
+            "p50_ms": 0.17957834064755707,
+            "p90_ms": 18.69892732763119,
+            "peak_allocated_MiB": 0.0,
+            "first_allocated_MiB": 0.0
+          },
+          "arms": {
+            "baseline": {
+              "p50_ms": 1.51448929682374,
+              "p90_ms": 1.8885272089391947,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            },
+            "candidate": {
+              "p50_ms": 1.5117696020752192,
+              "p90_ms": 1.5353928785771132,
+              "peak_allocated_MiB": 71.04541015625,
+              "peak_reserved_MiB": 90.0,
+              "first_allocated_MiB": 71.04541015625,
+              "first_reserved_MiB": 90.0
+            }
+          },
+          "max_elementwise_ratio": 0.6499296808126093
+        }
+      ],
+      "pairs": 2,
+      "strict_pass": 2,
+      "faster": 1,
+      "paired_p50_reduction_percent": 0.002882058839887014,
+      "range_p50_reduction_percent": [
+        -0.17381422296778304,
+        0.17957834064755707
+      ],
+      "max_elementwise_ratio": 0.8358685906153168,
+      "arms": {
+        "baseline": {
+          "p50_ms": 1.5081223100423813,
+          "p90_ms": 1.7023891909047961,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        },
+        "candidate": {
+          "p50_ms": 1.5080675948411226,
+          "p90_ms": 1.5275961020961404,
+          "peak_allocated_MiB": 71.04541015625,
+          "peak_reserved_MiB": 90.0,
+          "first_allocated_MiB": 71.04541015625,
+          "first_reserved_MiB": 90.0
+        }
+      }
+    }
+  },
+  "all_runs_including_invalid_controls": [
+    {
+      "tag": "r3-cold-base-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold-base-20261113/summary.json",
+      "status": "CONTROL_FAIL_GPU_INTERFERENCE"
+    },
+    {
+      "tag": "r3-cold2-base-trace0-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold2-base-trace0-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold2-early-f32-trace0-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold2-early-f32-trace0-20261113/summary.json",
+      "status": "CONTROL_FAIL_GPU_INTERFERENCE"
+    },
+    {
+      "tag": "r3-cold3-base-trace0-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-base-trace0-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold3-base-trace1-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-base-trace1-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold3-combo-trace0-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-combo-trace0-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold3-combo-trace1-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-combo-trace1-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold3-early-f32-trace0-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-early-f32-trace0-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-cold3-early-f32-trace1-20261113",
+      "path": "${REPRO_ROOT}/results/r3-cold3-early-f32-trace1-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-gather-new-activation-20261113",
+      "path": "${REPRO_ROOT}/results/r3-gather-new-activation-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-gather-old-activation-20261113",
+      "path": "${REPRO_ROOT}/results/r3-gather-old-activation-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-gather-strides-correctness-20261113",
+      "path": "${REPRO_ROOT}/results/r3-gather-strides-correctness-20261113/summary.json",
+      "status": "ENTRY_PASS"
+    },
+    {
+      "tag": "r3-screen-csr-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-csr-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3-screen-csr-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-csr-Neo4096-BA-20261113/summary.json",
+      "status": "GPU_BUSY_ABORTED"
+    },
+    {
+      "tag": "r3-screen-early-f32-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-early-f32-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3-screen-early-f32-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-early-f32-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3-screen-gather-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-gather-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3-screen-gather-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3-screen-gather-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-combo-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-combo-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-combo-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-combo-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo1000-AB-r0-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo1000-AB-r0-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo1000-BA-r1-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo1000-BA-r1-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo4096-AB-r2-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-AB-r2-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo4096-AB-r4-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-AB-r4-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo4096-BA-r3-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-BA-r3-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo4096-BA-r5-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo4096-BA-r5-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo8000-AB-r0-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo8000-AB-r0-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Neo8000-BA-r1-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Neo8000-BA-r1-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Plus4096-AB-r0-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Plus4096-AB-r0-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-confirm-combo-Plus4096-BA-r1-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-confirm-combo-Plus4096-BA-r1-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-csr-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-csr-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-csr-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-csr-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-early-f32-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-early-f32-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-early-f32-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-early-f32-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-gather-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-gather-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-gather-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-gather-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-host_geo-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-host_geo-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-host_geo-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-host_geo-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-single_runner-Neo4096-AB-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-single_runner-Neo4096-AB-20261113/summary.json",
+      "status": "PASS"
+    },
+    {
+      "tag": "r3m-single_runner-Neo4096-BA-20261113",
+      "path": "${REPRO_ROOT}/results/r3m-single_runner-Neo4096-BA-20261113/summary.json",
+      "status": "PASS"
+    }
+  ],
+  "cold_windows_including_invalid_controls": [
+    {
+      "tag": "r3-cold-base-20261113",
+      "control_status": "CONTROL_FAIL_GPU_INTERFERENCE",
+      "receipt": {
+        "source": "${REPRO_ROOT}/integration/c01_public_submission_20261113",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-8a1f47f6-0655-97e5-8ed5-433be97af788",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74494464,
+            "peak_reserved": 94371840,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74496512,
+            "peak_reserved": 94371840,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.7073421450331807,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 1.9047647847471723e-05,
+          "forces": 0.4413949298205104,
+          "virial": 0.07936603763545264,
+          "stress": 0.0025244166807023836
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold2-base-trace0-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/integration/c01_public_submission_20261113",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-8a1f47f6-0655-97e5-8ed5-433be97af788",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74494464,
+            "peak_reserved": 94371840,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74496512,
+            "peak_reserved": 94371840,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.5316031626425683,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 1.7889344985026644e-05,
+          "forces": 0.4726463385246065,
+          "virial": 0.09735563644307896,
+          "stress": 0.0003089638998528166
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold2-early-f32-trace0-20261113",
+      "control_status": "CONTROL_FAIL_GPU_INTERFERENCE",
+      "receipt": {
+        "source": "${REPRO_ROOT}/candidates/round3_lifetime_20261113/source",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-8a1f47f6-0655-97e5-8ed5-433be97af788",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59123712,
+            "peak_reserved": 77594624,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59903488,
+            "peak_reserved": 77594624,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.7268493971787393,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 3.178897981100176e-05,
+          "forces": 0.5733288430939197,
+          "virial": 0.11756962431087017,
+          "stress": 0.0005891494054547029
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-base-trace0-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/integration/c01_public_submission_20261113",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74494464,
+            "peak_reserved": 94371840,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74496512,
+            "peak_reserved": 94371840,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.6758834570646286,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 3.9897100151222765e-05,
+          "forces": 0.5404477213234956,
+          "virial": 0.07683235114723069,
+          "stress": 0.0005238965180830033
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-base-trace1-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/integration/c01_public_submission_20261113",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": true,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74494464,
+            "peak_reserved": 94371840,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 94371840,
+            "peak_allocated": 74496512,
+            "peak_reserved": 94371840,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 2.8952703196555376,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 3.17889797484056e-05,
+          "forces": 0.5448570735447117,
+          "virial": 0.06785810491341912,
+          "stress": 0.00023506302623070883
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-combo-trace0-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/candidates/round3_combo_20261113/source",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 65011712,
+            "peak_allocated": 54082048,
+            "peak_reserved": 65011712,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 65011712,
+            "peak_allocated": 54084096,
+            "peak_reserved": 65011712,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.674408281221986,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 2.1750354661553577e-05,
+          "forces": 0.46722822416123055,
+          "virial": 0.12277624496543176,
+          "stress": 0.00045710172506186305
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-combo-trace1-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/candidates/round3_combo_20261113/source",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": true,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 65011712,
+            "peak_allocated": 54082048,
+            "peak_reserved": 65011712,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 65011712,
+            "peak_allocated": 54084096,
+            "peak_reserved": 65011712,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 2.8922113836742938,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 1.3127432967681667e-05,
+          "forces": 0.4190386911539221,
+          "virial": 0.048013977534980525,
+          "stress": 0.000206845816580627
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-early-f32-trace0-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/candidates/round3_lifetime_20261113/source",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": false,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59123712,
+            "peak_reserved": 77594624,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59903488,
+            "peak_reserved": 77594624,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 3.7232558922842145,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 1.2226530720142515e-05,
+          "forces": 0.4997684450763368,
+          "virial": 0.19466783950706187,
+          "stress": 0.0008030626545659934
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    },
+    {
+      "tag": "r3-cold3-early-f32-trace1-20261113",
+      "control_status": "ENTRY_PASS",
+      "receipt": {
+        "source": "${REPRO_ROOT}/candidates/round3_lifetime_20261113/source",
+        "archive_sha256": "4418bff7deada02509d966f745f02a86ff962fb6237dd6b5cf5536c602b52bdf",
+        "trace_enabled": true,
+        "natoms": 4096,
+        "prior_explicit_inference_calls_in_worker": 0,
+        "gpu_name": "NVIDIA GeForce RTX 5090",
+        "sm_count": 170,
+        "shared_memory_per_block_optin": 101376,
+        "gpu_uuid": "GPU-fcc63da0-f1b3-74c7-f868-681a40ef5f03",
+        "windows": {
+          "load_and_first_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59123712,
+            "peak_reserved": 77594624,
+            "explicit_model_calls": 1,
+            "actual_eval_calls": 1
+          },
+          "warm_primary": {
+            "allocated": 9647616,
+            "reserved": 77594624,
+            "peak_allocated": 59903488,
+            "peak_reserved": 77594624,
+            "additional_model_calls": 5
+          }
+        },
+        "before_load": {
+          "allocated": 0,
+          "reserved": 0,
+          "peak_allocated": 0,
+          "peak_reserved": 0
+        },
+        "load_seconds": 2.9893784099258482,
+        "status": "PASS",
+        "actual_eval_calls": 6,
+        "self_elementwise_error_over_tolerance": {
+          "energy": 2.56113642708465e-05,
+          "forces": 0.4699184134548073,
+          "virial": 0.07140933930334332,
+          "stress": 0.000523468930319875
+        },
+        "scope": "trace affects lifetimes; use unprofiled cold/standard benchmark for peak claims; no steady speed claim"
+      }
+    }
+  ],
+  "timed_frames_in_monitored_pairs": 22000,
+  "definition": "positive reduction is better; time CI uses independent paired P50s, not individual frames; peaks use max across trials; trace is diagnostic only"
+}
