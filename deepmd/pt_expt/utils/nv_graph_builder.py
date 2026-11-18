@@ -62,6 +62,8 @@ def _periodic_edge_vectors(
     shift: torch.Tensor,
     cell: torch.Tensor,
     frame: torch.Tensor,
+    *,
+    store_fp32: bool = False,
 ) -> torch.Tensor:
     """Reproduce the FP64 gather, subtract and ordered periodic sum."""
     torch._dynamo.mark_static(coord, 1)
@@ -74,7 +76,8 @@ def _periodic_edge_vectors(
     p1 = shift[:, 1, None] * selected[:, 1, :]
     p2 = shift[:, 2, None] * selected[:, 2, :]
     periodic = ((torch.zeros_like(p0) + p0) + p1) + p2
-    return delta + torch.where(periodic == 0, 0.0, periodic)
+    edge_vec = delta + torch.where(periodic == 0, 0.0, periodic)
+    return edge_vec.float() if store_fp32 else edge_vec
 
 
 _compiled_periodic_edge_vectors = torch.compile(
@@ -436,6 +439,7 @@ def build_neighbor_graph_nv(
 
     n_node = torch.full((nf,), nloc, dtype=torch.int64, device=device)
     if fuse_geometry:
+        direct = _canonical_output and pair_excl is None and canonicalize
         offset = (n_node.cumsum(0) - n_node).index_select(0, frame_idx)
         center, source = center_local + offset, src_local + offset
         edge_vec = _compiled_periodic_edge_vectors(
@@ -445,7 +449,14 @@ def build_neighbor_graph_nv(
             shift.to(torch.float64),
             box_out.reshape(nf, 3, 3),
             frame_idx,
+            store_fp32=direct,
         )
+        if direct:
+            # NV decode supplies active destination-ordered edges; only the
+            # canonical two-slot minimum needs padding.
+            return _canonical_from_ordered_nv(
+                center, source, edge_vec, n_node, nf * nloc
+            )
         edge_index, edge_vec, edge_mask = pad_and_guard_edges(
             torch.stack((source, center)), edge_vec, None
         )
@@ -458,17 +469,6 @@ def build_neighbor_graph_nv(
         )
     if pair_excl is not None:
         graph = apply_pair_exclusion(graph, atype_flat, pair_excl, compact=compact)
-    if _canonical_output and fuse_geometry and pair_excl is None and canonicalize:
-        # Decode supplies the active prefix length and already sorts destinations.
-        # Skip generic CSR construction and converter checks of that prefix.
-        edges = src_local.numel()
-        return _canonical_from_ordered_nv(
-            graph.edge_index[1, :edges],
-            graph.edge_index[0, :edges],
-            graph.edge_vec[:edges],
-            n_node,
-            nf * nloc,
-        )
     if with_csr or canonicalize:
         # Matrix slots are decoded in ascending center order; compact filtering
         # preserves that order, whereas an exclusion mask can introduce holes.
