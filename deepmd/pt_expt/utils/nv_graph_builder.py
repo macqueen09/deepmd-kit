@@ -39,6 +39,7 @@ from deepmd.dpmodel.utils.neighbor_graph import (
     apply_pair_exclusion,
     attach_edge_csr,
     neighbor_graph_from_ijs,
+    pad_and_guard_edges,
 )
 from deepmd.pt.utils.nv_nlist import (
     _input_device_context,
@@ -47,6 +48,41 @@ from deepmd.pt.utils.nv_nlist import (
 )
 from deepmd.pt.utils.region import (
     normalize_coord,
+)
+
+
+def _periodic_edge_vectors(
+    coord: torch.Tensor,
+    center: torch.Tensor,
+    source: torch.Tensor,
+    shift: torch.Tensor,
+    cell: torch.Tensor,
+    frame: torch.Tensor,
+) -> torch.Tensor:
+    """Reproduce the FP64 gather, subtract and ordered periodic sum."""
+    torch._dynamo.mark_static(coord, 1)
+    torch._dynamo.mark_static(shift, 1)
+    for axis in range(3):
+        torch._dynamo.mark_static(cell, axis)
+    delta = coord.index_select(0, source) - coord.index_select(0, center)
+    selected = cell.index_select(0, frame)
+    p0 = shift[:, 0, None] * selected[:, 0, :]
+    p1 = shift[:, 1, None] * selected[:, 1, :]
+    p2 = shift[:, 2, None] * selected[:, 2, :]
+    periodic = ((torch.zeros_like(p0) + p0) + p1) + p2
+    return delta + torch.where(periodic == 0, 0.0, periodic)
+
+
+_compiled_periodic_edge_vectors = torch.compile(
+    _periodic_edge_vectors,
+    fullgraph=True,
+    dynamic=True,
+    options={
+        # Inductor must not contract the original separate multiply and add.
+        "emulate_precision_casts": True,
+        "triton.autotune_pointwise": False,
+        "triton.cudagraphs": False,
+    },
 )
 
 
@@ -299,7 +335,16 @@ def build_neighbor_graph_nv(
     device = coord.device
     nf, nloc = atype.shape[:2]
     coord = coord.reshape(nf, nloc, 3)
-    periodic = box is not None
+    fuse_geometry = (
+        type(coord) is torch.Tensor
+        and type(box) is torch.Tensor
+        and coord.is_cuda
+        and coord.device == box.device
+        and coord.dtype == box.dtype == torch.float64
+        and nf > 1
+        and layout is None
+        and not (coord.requires_grad or box.requires_grad)
+    )
 
     if nloc == 0:
         empty_i = torch.zeros((0,), dtype=torch.int64, device=device)
@@ -346,16 +391,28 @@ def build_neighbor_graph_nv(
         neighbor_matrix, num_neighbors, shifts, nloc, node_index=node_index
     )
 
-    graph = neighbor_graph_from_ijs(
-        center_local,
-        src_local,
-        shift,
-        coord,
-        box_out,
-        frame_idx,
-        torch.full((nf,), nloc, dtype=torch.int64, device=device),
-        layout=layout,
-    )
+    n_node = torch.full((nf,), nloc, dtype=torch.int64, device=device)
+    if fuse_geometry:
+        offset = (n_node.cumsum(0) - n_node).index_select(0, frame_idx)
+        center, source = center_local + offset, src_local + offset
+        edge_vec = _compiled_periodic_edge_vectors(
+            coord.reshape(-1, 3),
+            center,
+            source,
+            shift.to(torch.float64),
+            box_out.reshape(nf, 3, 3),
+            frame_idx,
+        )
+        edge_index, edge_vec, edge_mask = pad_and_guard_edges(
+            torch.stack((source, center)), edge_vec, None
+        )
+        graph = NeighborGraph(
+            n_node=n_node, edge_index=edge_index, edge_vec=edge_vec, edge_mask=edge_mask
+        )
+    else:
+        graph = neighbor_graph_from_ijs(
+            center_local, src_local, shift, coord, box_out, frame_idx, n_node, layout
+        )
     if pair_excl is not None:
         graph = apply_pair_exclusion(graph, atype_flat, pair_excl, compact=compact)
     if with_csr or canonicalize:
