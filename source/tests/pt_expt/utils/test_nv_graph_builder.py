@@ -85,6 +85,27 @@ def test_nv_batches_frames_without_python_loop():
     assert _edge_multiset(ng) == _edge_multiset(ng_ref)
 
 
+@pytest.mark.parametrize("edges", [0, 1, 33, 8192, 8193])
+def test_fused_periodic_geometry_matches_eager_bits(edges: int) -> None:
+    """Use the original broadcast sum as the independent FP64 reference."""
+    generator = torch.Generator(device="cuda").manual_seed(17)
+    coord = torch.randn(11, 3, dtype=torch.float64, device="cuda", generator=generator)
+    cell = torch.randn(2, 3, 3, dtype=torch.float64, device="cuda", generator=generator)
+    endpoints = torch.arange(edges, device="cuda")
+    center, source, frame = endpoints % 11, (endpoints + 1) % 11, endpoints % 2
+    shift = torch.randint(
+        -2, 3, (edges, 3), device="cuda", generator=generator
+    ).double()
+    expected = (coord[source] - coord[center]) + (shift[:, :, None] * cell[frame]).sum(
+        1
+    )
+    actual = nv_builder._compiled_periodic_edge_vectors(
+        coord, center, source, shift, cell, frame
+    )
+    assert actual.dtype == torch.float64
+    assert torch.equal(actual.view(torch.int64), expected.view(torch.int64))
+
+
 def test_nv_edge_vec_is_differentiable():
     dev = torch.device("cuda")
     coord = torch.tensor(
