@@ -120,6 +120,29 @@ def test_nv_edge_vec_is_differentiable():
     assert coord.grad is not None and torch.any(coord.grad != 0)
 
 
+@pytest.mark.parametrize("edges", [0, 1, 17])
+def test_direct_canonical_nv_matches_generic_converter(edges: int) -> None:
+    """Keep all seven canonical fields and the small-edge guard ABI."""
+    from dataclasses import (
+        fields,
+    )
+
+    from deepmd.pt_expt.utils.canonical_graph import (
+        canonical_graph_from_pairs,
+    )
+
+    n_node = torch.tensor([4, 4], device="cuda")
+    center = torch.arange(edges, device="cuda") // 3
+    source = torch.arange(edges, device="cuda").flip(0) % 8
+    vectors = torch.arange(edges * 3, device="cuda", dtype=torch.float64).reshape(-1, 3)
+    reference = canonical_graph_from_pairs(center, source, vectors, n_node, 8)
+    actual = nv_builder._canonical_from_ordered_nv(center, source, vectors, n_node, 8)
+    for field in fields(reference):
+        torch.testing.assert_close(
+            getattr(actual, field.name), getattr(reference, field.name), rtol=0, atol=0
+        )
+
+
 def test_nv_excludes_virtual_atoms_like_dense():
     """Virtual atoms (atype < 0) excluded as center AND neighbor (dense contract)."""
     dev = torch.device("cuda")

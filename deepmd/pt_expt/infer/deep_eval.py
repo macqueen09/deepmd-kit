@@ -2683,6 +2683,12 @@ class DeepEval(DeepEvalBackend):
                 self._rcut,
                 canonicalize=True,
                 pair_excl=pair_excl,
+                _canonical_output=(
+                    canonical
+                    and self._is_pt2
+                    and self.metadata.get("lower_input_kind") == "dpa4c_canonical"
+                    and self.metadata.get("graph_edge_dtype") == "float32"
+                ),
             )
         raise ValueError(
             f"unknown neighbor_graph_method {method!r}; "
