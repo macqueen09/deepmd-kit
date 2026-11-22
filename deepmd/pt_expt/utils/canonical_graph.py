@@ -380,6 +380,8 @@ def canonical_graph_from_pairs(
     edge_vec: torch.Tensor,
     n_node: torch.Tensor,
     node_count: int,
+    *,
+    with_source_csr: bool = True,
 ) -> CanonicalGraph:
     """Build a local canonical graph from active, unpadded neighbor pairs.
 
@@ -394,6 +396,11 @@ def canonical_graph_from_pairs(
         Per-frame local node counts with shape (nf,), int64, on the same device.
     node_count : int
         Total number of local nodes across frames, equal to ``n_node.sum()``.
+    with_source_csr : bool
+        Whether to build the source CSR. ``False`` skips the source ordering
+        and leaves two-entry zero placeholders, which serves a DPA4C consumer
+        that declines the per-atom virial. The destination CSR, geometry, and
+        node counts are identical either way.
 
     Returns
     -------
@@ -402,28 +409,46 @@ def canonical_graph_from_pairs(
         All nodes are local; no coordinate differentiation is required.
     """
     edge_count = source.shape[0]
-    destination_order = torch.argsort(center, stable=True)
+    # Valid node ids fit signed int32 up through node_count == 2**31.
+    # Keep the public indices and permutation int64; narrow only radix keys.
+    destination_key = center.to(torch.int32) if node_count <= 2**31 else center
+    destination_order = torch.argsort(destination_key, stable=True)
+    del destination_key
     center = center.index_select(0, destination_order)
     source = source.index_select(0, destination_order)
     edge_vec = edge_vec.index_select(0, destination_order).to(torch.float32)
     boundaries = torch.arange(node_count + 1, dtype=torch.int64, device=source.device)
     destination_row_ptr = torch.searchsorted(center, boundaries)
-    source_order = torch.argsort(source, stable=True)
-    source_row_ptr = torch.searchsorted(
-        source.index_select(0, source_order), boundaries
-    )
+    if with_source_csr:
+        source_key = source.to(torch.int32) if node_count <= 2**31 else source
+        source_order = torch.argsort(source_key, stable=True)
+        del source_key
+        source_row_ptr = torch.searchsorted(
+            source.index_select(0, source_order), boundaries
+        )
+    else:
+        # Two-entry zero placeholders: the compact deployment contract reads no
+        # source row and allocates no edge gradient when the caller declines the
+        # per-atom virial, so no source ordering is needed here.
+        source_row_ptr = torch.zeros(2, dtype=torch.int64, device=source.device)
+        source_order = torch.zeros(2, dtype=torch.int64, device=source.device)
     # Guard slots keep the exported edge axis dynamic even for zero or one
     # physical edge. CSR offsets exclude these slots from every node row.
     if edge_count < 2:
         padding = 2 - edge_count
         source = torch.cat((source, source.new_zeros(padding)))
         edge_vec = torch.cat((edge_vec, edge_vec.new_zeros((padding, 3))))
-        source_order = torch.cat(
-            (
-                source_order,
-                torch.arange(edge_count, 2, dtype=torch.int64, device=source.device),
+        # The placeholder already has its final two slots; only real source
+        # ordering grows to cover the guard slots.
+        if with_source_csr:
+            source_order = torch.cat(
+                (
+                    source_order,
+                    torch.arange(
+                        edge_count, 2, dtype=torch.int64, device=source.device
+                    ),
+                )
             )
-        )
     n_node = n_node.contiguous()
     return CanonicalGraph(
         n_node=n_node,
