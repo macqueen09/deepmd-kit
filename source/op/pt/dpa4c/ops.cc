@@ -72,6 +72,14 @@
 #include <torch/library.h>
 
 TORCH_LIBRARY_FRAGMENT(deepmd, library) {
+  // 候选行热更新: 缓存的 rcut+skin 候选按中心原子分行存放, 每步以当前
+  // 坐标重算 FP64 几何并做严格截断判定, 输出压实后的行指针/源/几何。
+  library.def(
+      "dpa4c_candidate_rows_select(Tensor row_ptr, Tensor cand_source, "
+      "Tensor shift_vec, Tensor positions, float rcut) "
+      "-> (Tensor new_row_ptr, Tensor source, Tensor edge_vec)");
+}
+TORCH_LIBRARY_FRAGMENT(deepmd, library) {
   library.def(
       "dpa4c_graph_compress(Tensor edge_vec, Tensor edge_index, "
       "Tensor edge_mask, Tensor destination_order, "

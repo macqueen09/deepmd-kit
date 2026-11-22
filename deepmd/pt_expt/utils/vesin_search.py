@@ -44,6 +44,9 @@ class VesinNeighborSearch:
         self.sorted = sorted
         self._key: tuple[float, torch.device] | None = None
         self._frames: dict[int, tuple[NeighborList, torch.Tensor | None]] = {}
+        # 候选行缓存(计划C): 普通单帧 canonical 路径的热步用它跳过每帧
+        # 排序与重排; 其余路径不碰它, 失效即整体重建。
+        self.candidate_row_cache: object | None = None
 
     def compute(
         self,

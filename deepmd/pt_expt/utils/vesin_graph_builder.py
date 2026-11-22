@@ -237,6 +237,46 @@ def build_canonical_graph_vesin(
         is detached; this builder serves exported models with explicit forces.
     """
     nf, nloc, _ = coord.shape
+    # 候选行热路径(计划C首版): 只服务普通求力的单帧周期 canonical 请求
+    # (无逐原子维里 => 无源CSR, 无节点掩码)。原生算子在场且输入满足
+    # 契约(FP64 CUDA)才启用; 其余一切情况走下方原路径。
+    if (
+        nloc > 0
+        and nf == 1
+        and with_source_csr is False
+        and (node_mask is None or bool(node_mask.all()))
+        and box is not None
+        and coord.is_cuda
+        and coord.dtype == torch.float64
+        and search.skin > 0
+        and not torch.compiler.is_compiling()
+    ):
+        from deepmd.pt_expt.utils.candidate_rows import (
+            CandidateRowCache,
+            candidate_rows_available,
+        )
+
+        if candidate_rows_available():
+            cache = search.candidate_row_cache
+            if cache is None or not cache.matches(rcut, search.skin, nloc, coord[0]):
+                cache = CandidateRowCache(rcut, search.skin, nloc)
+                search.candidate_row_cache = cache
+                cache.rebuild(coord[0], box[0])
+            elif not cache.valid_for(coord[0], box[0]):
+                cache.rebuild(coord[0], box[0])
+            row_ptr, source, edge_vec = cache.hot(coord[0])
+            n_node = torch.full((1,), nloc, dtype=torch.int64, device=coord.device)
+            return CanonicalGraph(
+                n_node=n_node,
+                n_local=n_node,
+                source=source,
+                edge_vec=edge_vec,
+                destination_row_ptr=row_ptr,
+                # 普通请求不需要源 CSR: 两槽零占位, 与 from_pairs 的
+                # with_source_csr=False 分支一致。
+                source_row_ptr=torch.zeros(2, dtype=torch.int64, device=coord.device),
+                source_order=torch.zeros(2, dtype=torch.int64, device=coord.device),
+            )
     centers, sources, vectors = [], [], []
     for frame in range(nf):
         if nloc == 0:
