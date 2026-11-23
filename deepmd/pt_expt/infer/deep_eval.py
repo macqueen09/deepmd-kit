@@ -2302,6 +2302,13 @@ class DeepEval(DeepEvalBackend):
             atom_types = np.tile(atom_types, (nframes, 1))
         else:
             natoms = atom_types.shape[1]
+        # Upload the flat types before the graph builders run. A pageable
+        # host-to-device copy completes only after prior stream work, so
+        # issuing it after graph building stalls the CPU for the whole build;
+        # first, the stream is still idle and the copy overlaps the build.
+        atype_t = torch.as_tensor(
+            atom_types.reshape(-1), dtype=torch.int64, device=DEVICE
+        )
         graph = self._build_eval_graph(
             coords.reshape(nframes, natoms, 3),
             atom_types,
@@ -2309,9 +2316,6 @@ class DeepEval(DeepEvalBackend):
             DEVICE,
             canonical=canonical,
             with_source_csr=with_source_csr,
-        )
-        atype_t = torch.as_tensor(
-            atom_types.reshape(-1), dtype=torch.int64, device=DEVICE
         )
         edge_dtype = (
             torch.float32
