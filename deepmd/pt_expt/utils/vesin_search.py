@@ -10,9 +10,13 @@ from typing import (
     TYPE_CHECKING,
 )
 
+import numpy as np
 import torch
 
 if TYPE_CHECKING:
+    from numpy.typing import (
+        NDArray,
+    )
     from vesin_torch import (
         NeighborList,
     )
@@ -43,7 +47,12 @@ class VesinNeighborSearch:
         self.skin = float(skin)
         self.sorted = sorted
         self._key: tuple[float, torch.device] | None = None
-        self._frames: dict[int, tuple[NeighborList, torch.Tensor | None]] = {}
+        # 每个 frame 槽存 (计算器, GPU 晶胞快照, 主机晶胞快照)。主机快照只在
+        # 调用者提供了可信主机镜像时存在, 供失效判定做无同步的主机比较。
+        self._frames: dict[
+            int,
+            tuple[NeighborList, torch.Tensor | None, np.ndarray | None],
+        ] = {}
         # 候选行缓存(计划C): 普通单帧 canonical 路径的热步用它跳过每帧
         # 排序与重排; 其余路径不碰它, 失效即整体重建。
         self.candidate_row_cache: object | None = None
@@ -56,6 +65,7 @@ class VesinNeighborSearch:
         *,
         frame: int = 0,
         return_vectors: bool = False,
+        host_cell: NDArray[np.floating] | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Return neighbor indices and image shifts or displacement vectors.
 
@@ -76,6 +86,14 @@ class VesinNeighborSearch:
             Return neighbor-minus-center vectors in angstrom instead of
             lattice shifts. These vectors are detached from the coordinates
             and are intended for inference with explicit force outputs.
+        host_cell : numpy.ndarray, optional
+            Host mirror of ``cell`` carrying the values that were uploaded to
+            the device for THIS call, or None when the caller has no trusted
+            host copy. When both this frame's snapshot and ``host_cell``
+            exist, the cache-invalidation cell comparison runs on the host
+            without a device sync; otherwise the original GPU ``torch.equal``
+            path decides. The mirror must hold the same values as ``cell`` --
+            passing a stale mirror can silently reuse a wrong Verlet cache.
 
         Returns
         -------
@@ -98,20 +116,25 @@ class VesinNeighborSearch:
         if self._key != key:
             self._frames.clear()
             self._key = key
-        calculator, previous_cell = self._frames.get(frame, (None, None))
+        calculator, previous_cell, previous_host = self._frames.get(
+            frame, (None, None, None)
+        )
         # Cell deformation can bring uncached periodic images inside the
         # cutoff even when Vesin's single-cell displacement bound permits
-        # reuse. Comparing CUDA cells synchronizes this invalidation decision.
+        # reuse. A trusted host mirror decides without synchronizing the GPU;
+        # without one, comparing CUDA cells synchronizes this decision.
+        cells_match = (
+            np.array_equal(host_cell, previous_host)
+            if host_cell is not None and previous_host is not None
+            else (
+                cell is not None
+                and previous_cell is not None
+                and torch.equal(cell, previous_cell)
+            )
+        )
         if calculator is None or (
             self.skin > 0
-            and (
-                (cell is None) != (previous_cell is None)
-                or (
-                    cell is not None
-                    and previous_cell is not None
-                    and not torch.equal(cell, previous_cell)
-                )
-            )
+            and ((cell is None) != (previous_cell is None) or not cells_match)
         ):
             calculator = NeighborList(
                 cutoff=float(rcut),
@@ -119,11 +142,17 @@ class VesinNeighborSearch:
                 sorted=self.sorted,
                 skin=self.skin,
             )
-            # An independent snapshot detects in-place updates to the input.
+            # Independent snapshots detect in-place updates to the input; the
+            # host snapshot corresponds to the value uploaded for this call.
             previous_cell = (
                 cell.detach().clone() if self.skin > 0 and cell is not None else None
             )
-            self._frames[frame] = calculator, previous_cell
+            previous_host = (
+                np.array(host_cell, copy=True)
+                if self.skin > 0 and host_cell is not None
+                else None
+            )
+            self._frames[frame] = calculator, previous_cell, previous_host
         box = (
             cell
             if cell is not None

@@ -12,6 +12,7 @@ from __future__ import (
     annotations,
 )
 
+import numpy as np
 import torch
 
 from deepmd.pt_expt.utils.canonical_graph import (
@@ -42,6 +43,9 @@ class CandidateRowCache:
         self.shift_vec: torch.Tensor | None = None
         self.ref_pos: torch.Tensor | None = None
         self.ref_cell: torch.Tensor | None = None
+        # 主机晶胞快照(计划H1): 重建时若调用者提供了可信主机镜像则留一份,
+        # 热步的失效判定可用主机比较, 免去 GPU 晶胞的同步读取。
+        self.ref_cell_host: np.ndarray | None = None
 
     def matches(
         self, rcut: float, skin: float, node_count: int, positions: torch.Tensor
@@ -57,8 +61,18 @@ class CandidateRowCache:
             and positions.dtype == torch.float64
         )
 
-    def rebuild(self, positions: torch.Tensor, cell: torch.Tensor) -> None:
-        """Rebuild the candidate rows from the public Vesin interface."""
+    def rebuild(
+        self,
+        positions: torch.Tensor,
+        cell: torch.Tensor,
+        host_cell: np.ndarray | None = None,
+    ) -> None:
+        """Rebuild the candidate rows from the public Vesin interface.
+
+        ``host_cell`` is the optional host mirror of the values uploaded as
+        ``cell``; a copy is kept so later in-place edits of the caller's array
+        are still detected by :meth:`valid_for`.
+        """
         from vesin_torch import (
             NeighborList,
         )
@@ -92,10 +106,26 @@ class CandidateRowCache:
         ).contiguous()
         self.ref_pos = positions.detach().clone()
         self.ref_cell = cell.detach().clone()
+        self.ref_cell_host = (
+            None if host_cell is None else np.array(host_cell, copy=True)
+        )
 
-    def valid_for(self, positions: torch.Tensor, cell: torch.Tensor) -> bool:
-        """Cell unchanged and every atom within skin / 2 of its reference."""
-        if not torch.equal(cell, self.ref_cell):
+    def valid_for(
+        self,
+        positions: torch.Tensor,
+        cell: torch.Tensor,
+        host_cell: np.ndarray | None = None,
+    ) -> bool:
+        """Cell unchanged and every atom within skin / 2 of its reference.
+
+        The cell comparison runs on the host when both the stored snapshot and
+        the caller's ``host_cell`` mirror exist (no device sync); otherwise the
+        GPU ``torch.equal`` of the original implementation decides.
+        """
+        if host_cell is not None and self.ref_cell_host is not None:
+            if not np.array_equal(host_cell, self.ref_cell_host):
+                return False
+        elif not torch.equal(cell, self.ref_cell):
             return False
         moved = (positions - self.ref_pos).norm(dim=1).max()
         return bool(moved < self.skin / 2)
