@@ -34,6 +34,7 @@ from deepmd.pt_expt.kernels.dpa4c.graph_compress import (
     _reference_backward,
     _reference_descriptor,
     _reference_forward,
+    _table_lookup,
     build_compression_artifacts,
     build_low_rank_table,
     build_radial_table,
@@ -1088,3 +1089,128 @@ def test_unfolded_mode_counts_keep_the_direct_table() -> None:
     basis_table, basis_matrix = build_low_rank_table(descriptor)
     assert basis_table.numel() == 0
     assert basis_matrix.numel() == 0
+
+
+def _build_rank_descriptor(n_radial: int, rank: int) -> DescrptDPA4C:
+    """Return a descriptor of 128 channels whose scalar-only channels span ``rank`` functions.
+
+    Sixteen radial basis functions make the hidden state of the radial map
+    vary in more directions than the widest basis holds, so the channels
+    need a basis of at least ``rank`` functions to reproduce them.
+    """
+    descriptor = DescrptDPA4C(
+        rcut=3.0,
+        ntypes=2,
+        channels=128,
+        lmax=3,
+        n_radial=n_radial,
+        radial_modes=4,
+        precision="float32",
+        seed=17,
+        type_map=_TYPE_MAP,
+    ).eval()
+    _restrict_scalar_rank(descriptor, rank=rank)
+    return descriptor
+
+
+@pytest.mark.parametrize(
+    ("rank", "width"), [(8, 32), (32, 32), (33, 48), (48, 48), (64, 0)]
+)
+def test_low_rank_table_adopts_the_first_certified_width(rank: int, width: int) -> None:
+    """The compression adopts the first candidate width that reproduces the channels.
+
+    Scalar-only channels confined to at most thirty-two functions take the
+    basis of thirty-two, those confined to more take the wider basis of
+    forty-eight, and channels that neither reproduces keep the direct table.
+    """
+    descriptor = _build_rank_descriptor(16, rank)
+    basis_table, basis_matrix = build_low_rank_table(descriptor)
+    first = descriptor_profile(descriptor.channels, descriptor.lmax).degree_channels[1]
+    if width == 0:
+        assert basis_table.numel() == 0
+        assert basis_matrix.numel() == 0
+        return
+    assert basis_matrix.shape == (width, descriptor.channels - first)
+    assert basis_table.shape[1] == 6 * (first + width + descriptor.radial_modes)
+
+
+def _values_and_derivatives(
+    table: torch.Tensor, radius: torch.Tensor, stride: float, table_max: float
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Evaluate a quintic table and its radial derivative at ``radius``, in fp64."""
+    value = _table_lookup(
+        table.double(), radius, stride, table_max, table.shape[1] // 6
+    )
+    derivative = torch.stack(
+        [
+            torch.autograd.grad(value[:, column].sum(), radius, retain_graph=True)[0]
+            for column in range(value.shape[1])
+        ],
+        dim=1,
+    )
+    return value.detach(), derivative.detach()
+
+
+@pytest.mark.parametrize("width", [32, 48])
+def test_low_rank_tables_carry_the_channels_between_their_knots(width: int) -> None:
+    """Values and radial derivatives of the channels agree with the direct table off the knots.
+
+    The adoption check compares the channels at the knots. Between them, the
+    quintic of the expanded basis and the quintic of the channels differ only
+    through the fp32 rounding of their coefficients, so at points inside every
+    interval the scalar-only channels and their radial derivatives agree to
+    the rounding of the table, and the expanded table meets itself at the
+    knots and ends at its last one, the cutoff.
+    """
+    descriptor = _build_rank_descriptor(16, 8 if width == 32 else 48)
+    basis_table, basis_matrix = build_low_rank_table(descriptor)
+    direct, info = build_radial_table(descriptor)
+    stride, table_max = float(info[0]), float(info[1])
+    first = descriptor_profile(descriptor.channels, descriptor.lmax).degree_channels[1]
+    channels = descriptor.channels
+    assert basis_matrix.shape[0] == width
+    intervals = direct.shape[0] - 1
+    knots = torch.arange(intervals, dtype=torch.float64)
+    inside = (
+        knots[:, None] + torch.tensor([[0.137, 0.5, 0.913]], dtype=torch.float64)
+    ) * stride
+    radius = inside.flatten().requires_grad_()
+    expanded, expanded_derivative = _values_and_derivatives(
+        basis_table, radius, stride, table_max
+    )
+    expanded = expanded[:, first : first + width] @ basis_matrix.double()
+    expanded_derivative = (
+        expanded_derivative[:, first : first + width] @ basis_matrix.double()
+    )
+    plain, plain_derivative = _values_and_derivatives(direct, radius, stride, table_max)
+    scale = plain[:, first:channels].abs().amax(0).clamp_min(1e-30)
+    slope_scale = plain_derivative[:, first:channels].abs().amax(0).clamp_min(1e-30)
+    torch.testing.assert_close(
+        expanded / scale, plain[:, first:channels] / scale, atol=1e-5, rtol=0
+    )
+    torch.testing.assert_close(
+        expanded_derivative / slope_scale,
+        plain_derivative[:, first:channels] / slope_scale,
+        atol=1e-4,
+        rtol=0,
+    )
+    # The expanded table meets itself across a knot and ends at the cutoff.
+    joints = (
+        torch.tensor([1, intervals // 3, intervals - 1], dtype=torch.float64) * stride
+    )
+    below = (joints - 1e-7 * stride).requires_grad_()
+    above = (joints + 1e-7 * stride).requires_grad_()
+    low, low_derivative = _values_and_derivatives(basis_table, below, stride, table_max)
+    high, high_derivative = _values_and_derivatives(
+        basis_table, above, stride, table_max
+    )
+    joint_scale = low.abs().amax(0).clamp_min(1e-30)
+    torch.testing.assert_close(
+        (high - low) / joint_scale, torch.zeros_like(low), atol=1e-4, rtol=0
+    )
+    torch.testing.assert_close(
+        (high_derivative - low_derivative) / joint_scale,
+        torch.zeros_like(low),
+        atol=1e-4 / stride,
+        rtol=0,
+    )

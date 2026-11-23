@@ -922,7 +922,15 @@ def test_slotted_scans_match_the_portable_equations(
         types=range(type_count),
     )
     arguments = _arguments(descriptor, graph, atype)
-    assert (arguments[6].numel() > 0) is low_rank
+    # The profile of one hundred twenty-eight channels and angular degree
+    # three also lists a wider basis of forty-eight functions, which
+    # reproduces even the channels of a fresh descriptor, so it adopts one
+    # there; every other profile keeps the direct table for them.
+    assert (
+        arguments[6].numel() > 0
+        if (low_rank or (channels, lmax) == (128, 3))
+        else arguments[6].numel() == 0
+    )
 
     edge_vec = graph.edge_vec.detach().clone().requires_grad_(True)
     output, _state = torch.ops.deepmd.dpa4c_graph_compress(edge_vec, *arguments)
@@ -1091,7 +1099,14 @@ def test_fused_slotted_scans_match_the_reference(
     if low_rank:
         _restrict_scalar_rank(descriptor, rank=32)
     artifacts = build_compression_artifacts(descriptor)
-    assert (artifacts["basis_table"].numel() > 0) is low_rank
+    # As in ``test_slotted_scans_match_the_portable_equations``, the profile
+    # of one hundred twenty-eight channels and angular degree three adopts
+    # the wider basis of forty-eight functions for a fresh descriptor.
+    assert (
+        artifacts["basis_table"].numel() > 0
+        if (low_rank or (channels, lmax) == (128, 3))
+        else artifacts["basis_table"].numel() == 0
+    )
     descriptor._set_compression(artifacts)
     check = functools.partial(
         _check_canonical_against_reference,
@@ -5475,3 +5490,198 @@ def test_halo_rows_match_the_folded_frame(
             _fold_halo(operator(*[_to_cpu(a) for a in arguments]), owner, owned),
             reference,
         )
+
+
+# === Low-rank bases wider than a warp ===
+
+
+def _build_rank_descriptor(
+    n_radial: int,
+    rank: int,
+    type_map: Sequence[str] = tuple(_TYPE_MAP),
+) -> DescrptDPA4C:
+    """Return an fp32 descriptor of 128 channels whose scalar-only channels span ``rank`` functions.
+
+    Sixteen radial basis functions make the hidden state of the radial map
+    vary in more directions than the widest basis holds, so the channels
+    need a basis of at least ``rank`` functions to reproduce them.
+    """
+    descriptor = (
+        DescrptDPA4C(
+            rcut=3.0,
+            ntypes=len(type_map),
+            channels=128,
+            lmax=3,
+            n_radial=n_radial,
+            radial_modes=4,
+            precision="float32",
+            seed=17,
+            type_map=list(type_map),
+        )
+        .cuda()
+        .eval()
+    )
+    _strengthen_mode_mixing(descriptor)
+    _restrict_scalar_rank(descriptor, rank=rank)
+    return descriptor
+
+
+@_GPU
+@pytest.mark.parametrize(
+    ("system", "types"),
+    [
+        ("split", (0,)),
+        ("coscheduled", (0,)),
+        ("unsplit", (0, 1)),
+        ("unsplit", (0, 2, 3, 5, 6, 7)),
+    ],
+)
+def test_wide_low_rank_table_matches_the_reference(
+    system: str,
+    types: tuple[int, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The scans of a low-rank table wider than a warp match the CPU reference.
+
+    Scalar-only channels confined to forty-eight functions make the
+    compression adopt a basis of forty-eight functions, which has no slotted
+    low-rank scan. A single-type system reads it in the folded scan of the
+    plain kernel, in a system whose rows share warps and in one whose rows
+    take a warp of a co-scheduled block each; its forces differ from those of
+    the same descriptor without the basis in the last bits, which shows that
+    the low-rank scan ran. A system of two or of six types keeps the slotted
+    scans of the mode profiles, which read the radial table, and follows the
+    reference with and without the basis alike. The CPU reference reads the
+    radial table in both cases.
+    """
+    multiprocessors = torch.cuda.get_device_properties("cuda").multi_processor_count
+    node_count = {
+        "split": 40,
+        "unsplit": 16 * multiprocessors + 17,
+        "coscheduled": 4 * 24 * multiprocessors + 17,
+    }[system]
+    single_type = len(types) == 1
+    descriptor = _build_rank_descriptor(
+        16, 48, type_map=_WIDE_TYPE_MAP[:8] if not single_type else _TYPE_MAP
+    )
+    artifacts = build_compression_artifacts(descriptor)
+    first = descriptor_profile(128, 3).degree_channels[1]
+    assert artifacts["basis_matrix"].shape == (48, 128 - first)
+    descriptor._set_compression(artifacts)
+    check = functools.partial(
+        _check_canonical_against_reference,
+        descriptor,
+        False,
+        monkeypatch,
+        node_count=node_count,
+        side=5.0 * (node_count / 40) ** (1.0 / 3.0),
+        single_type=single_type,
+        types=types,
+    )
+    low_rank = check()
+    empty = artifacts["basis_table"].new_empty(0)
+    descriptor._set_compression(
+        {**artifacts, "basis_table": empty, "basis_matrix": empty}
+    )
+    direct = check()
+    if single_type:
+        assert not torch.equal(low_rank[2], direct[2])
+
+
+@_GPU
+def test_channels_beyond_the_widest_basis_keep_the_direct_scans(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Channels that no candidate basis reproduces keep the direct scans.
+
+    A radial map of higher rank than the widest basis certifies against both
+    candidate widths, so the compression builds no low-rank table and the
+    scans read the radial table: the operator follows the CPU reference as
+    an uncompressed-by-basis descriptor does, in a single-type system and in
+    one of two types.
+    """
+    descriptor = _build_rank_descriptor(16, 64)
+    artifacts = build_compression_artifacts(descriptor)
+    assert artifacts["basis_table"].numel() == 0
+    assert artifacts["basis_matrix"].numel() == 0
+    descriptor._set_compression(artifacts)
+    _check_canonical_against_reference(descriptor, False, monkeypatch)
+    _check_canonical_against_reference(
+        descriptor, False, monkeypatch, single_type=False, types=(0, 1)
+    )
+
+
+@_GPU
+def test_a_basis_width_without_a_compiled_scan_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A low-rank table of a width without a compiled scan fails the operator.
+
+    The table build takes the widths its candidates list; one that the
+    device side did not compile a scan for is a mismatch, which the operator
+    reports before any scan rather than scanning with a basis of another
+    width.
+    """
+    from deepmd.pt_expt.kernels import dpa4c
+
+    monkeypatch.setattr(
+        dpa4c.graph_compress,
+        "_LOW_RANK_BASIS",
+        {(64, 2): (32,), (128, 3): (32, 40)},
+    )
+    descriptor = _build_rank_descriptor(16, 40)
+    artifacts = build_compression_artifacts(descriptor)
+    assert artifacts["basis_matrix"].shape[0] == 40
+    descriptor._set_compression(artifacts)
+    with pytest.raises(RuntimeError, match="no compiled scan carries a basis of 40"):
+        _check_canonical_against_reference(descriptor, False, monkeypatch)
+
+
+@_GPU
+@pytest.mark.parametrize(("rank", "width"), [(8, 32), (40, 0)])
+def test_a_descriptor_of_several_blocks_keeps_the_channel_width(
+    rank: int, width: int
+) -> None:
+    """A descriptor of several message-passing blocks adopts the channel-derived width alone.
+
+    Its first block runs in stages and its further blocks through launches
+    that carry the width the channel count derives, so the compression tries
+    no wider basis: channels that the wider basis would reproduce, as the
+    same radial map of a single block shows, keep the direct table.
+    """
+    descriptor = _build_block_descriptor(128, 3, 4, (3.0, 2.5))
+    assert descriptor.attentions
+    _restrict_scalar_rank(descriptor, rank=rank)
+    artifacts = build_compression_artifacts(descriptor)
+    adopted = (
+        0
+        if artifacts["basis_matrix"].numel() == 0
+        else artifacts["basis_matrix"].shape[0]
+    )
+    assert adopted == width
+    if rank > 32:
+        single = _build_descriptor(128, 3, 4)
+        _restrict_scalar_rank(single, rank=rank)
+        assert build_compression_artifacts(single)["basis_matrix"].shape[0] == 48
+
+
+@_GPU
+@pytest.mark.parametrize("lmax", [2, 4])
+def test_a_degree_without_a_compiled_wide_scan_keeps_the_channel_width(
+    lmax: int,
+) -> None:
+    """A profile without a compiled wide scan adopts the channel-derived width alone.
+
+    Scalar-only channels that the basis of forty-eight functions reproduces
+    make the compression of angular degree three adopt it; the same channels
+    of angular degree two or four keep the direct table, because the device
+    side compiles the wider scan for degree three alone.
+    """
+    descriptor = _build_descriptor(128, lmax, 4)
+    _restrict_scalar_rank(descriptor, rank=40)
+    artifacts = build_compression_artifacts(descriptor)
+    assert artifacts["basis_table"].numel() == 0
+    assert artifacts["basis_matrix"].numel() == 0
+    degree_three = _build_descriptor(128, 3, 4)
+    _restrict_scalar_rank(degree_three, rank=40)
+    assert build_compression_artifacts(degree_three)["basis_matrix"].shape[0] == 48

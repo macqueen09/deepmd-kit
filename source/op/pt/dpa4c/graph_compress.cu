@@ -111,12 +111,12 @@ Dimensions profile_dimensions(int channels, int lmax, bool has_spin) {
   TORCH_CHECK(false, "dpa4c_graph_compress: unsupported channels ", channels);
 }
 
-template <int Channels, int Lmax>
+template <int Channels, int Lmax, int Basis = -1>
 void launch(bool backward, const Arguments& arguments, cudaStream_t stream) {
   if (backward) {
-    deepmd_dpa4c::launch_backward<Channels, Lmax>(arguments, stream);
+    deepmd_dpa4c::launch_backward<Channels, Lmax, Basis>(arguments, stream);
   } else {
-    deepmd_dpa4c::launch_forward<Channels, Lmax>(arguments, stream);
+    deepmd_dpa4c::launch_forward<Channels, Lmax, Basis>(arguments, stream);
   }
 }
 
@@ -124,33 +124,62 @@ void launch(bool backward, const Arguments& arguments, cudaStream_t stream) {
 // still checked rather than folded into the highest degree, so that a degree
 // outside the compiled set fails loudly instead of running a kernel for a
 // different model.
-template <int Channels>
+/// The angular degrees a basis width of `Basis` functions is compiled for:
+/// every degree for the width the channel count derives, and degree three
+/// alone for a wider basis, that of the released weights that certify one
+/// (`lowrank_wide.cu`).
+template <int Basis>
+constexpr bool wide_degree_compiled(int lmax) {
+  return Basis < 0 || lmax == 3;
+}
+
+template <int Channels, int Basis = -1>
 void dispatch_degree(bool backward,
                      const Arguments& arguments,
                      cudaStream_t stream) {
+  // A degree without a compiled launch of this basis must not be named
+  // here either, or the link of the operator library would miss it.
   switch (arguments.lmax) {
     case 2:
-      launch<Channels, 2>(backward, arguments, stream);
-      return;
+      if constexpr (wide_degree_compiled<Basis>(2)) {
+        launch<Channels, 2, Basis>(backward, arguments, stream);
+        return;
+      }
+      break;
     case 3:
-      launch<Channels, 3>(backward, arguments, stream);
-      return;
+      if constexpr (wide_degree_compiled<Basis>(3)) {
+        launch<Channels, 3, Basis>(backward, arguments, stream);
+        return;
+      }
+      break;
     case 4:
-      launch<Channels, 4>(backward, arguments, stream);
-      return;
+      if constexpr (wide_degree_compiled<Basis>(4)) {
+        launch<Channels, 4, Basis>(backward, arguments, stream);
+        return;
+      }
+      break;
     default:
-      TORCH_CHECK(false, "dpa4c_graph_compress: uncompiled angular degree ",
-                  arguments.lmax);
+      break;
   }
+  TORCH_CHECK(
+      false, "dpa4c_graph_compress: uncompiled angular degree ",
+      arguments.lmax, " for a low-rank basis of ",
+      Basis < 0 ? std::string("the channel count")
+                : std::to_string(Basis) + " functions");
 }
 
 void dispatch(int channels,
               bool backward,
+              int basis_width,
               const Arguments& arguments,
               cudaStream_t stream) {
 #define DPA4C_DISPATCH(width)                            \
   if (channels == width) {                               \
-    dispatch_degree<width>(backward, arguments, stream); \
+    if (basis_width == 48 && width == 128) {             \
+      dispatch_degree<width, 48>(backward, arguments, stream); \
+    } else {                                             \
+      dispatch_degree<width>(backward, arguments, stream); \
+    }                                                    \
     DPA4C_CHECK_LAUNCH("dpa4c_graph_compress");          \
     return;                                              \
   }
@@ -179,11 +208,28 @@ void dispatch_first_stage_degree(FirstStage stage,
   }
 }
 
+/// The staged launches of a descriptor of several blocks -- the stages of
+/// its first block and the launches of its further blocks -- carry the
+/// basis width the native launchers derive from the channel count; the
+/// compiled wider specializations serve the whole-system launches of a
+/// descriptor of one block alone. The table build keeps such a descriptor
+/// on that first width, so a wider table reaching a staged launch is a
+/// mismatch and fails here rather than scanning with the wrong basis.
+void check_staged_basis(const Arguments& arguments) {
+  TORCH_CHECK(
+      arguments.basis_width == 0 || arguments.basis_width == 32,
+      "dpa4c_graph_compress: a low-rank basis of ",
+      arguments.basis_width,
+      " functions serves a descriptor of one block only; a descriptor of "
+      "several blocks carries the width derived from its channel count");
+}
+
 /// One stage of the first block of a descriptor of several blocks.
 void dispatch_first_stage(int channels,
                           FirstStage stage,
                           const Arguments& arguments,
                           cudaStream_t stream) {
+  check_staged_basis(arguments);
 #define DPA4C_DISPATCH(width)                                     \
   if (channels == width) {                                        \
     dispatch_first_stage_degree<width>(stage, arguments, stream); \
@@ -220,6 +266,7 @@ void dispatch_block(int channels,
                     BlockStage stage,
                     const BlockArguments& arguments,
                     cudaStream_t stream) {
+  check_staged_basis(arguments.edges);
 #define DPA4C_DISPATCH(width)                               \
   if (channels == width) {                                  \
     dispatch_block_degree<width>(stage, arguments, stream); \
@@ -434,17 +481,26 @@ Arguments build_arguments(const Payload& payload,
                     ? std::string("a spin-conditioned descriptor admits")
                     : std::to_string(channels) + " channels admit",
                 " no low-rank radial table");
+    // The adopted width of the table: the channel-derived default, or the
+    // wider basis a compiled specialization of the same profile carries.
+    const long adopted =
+        payload.basis_table.size(1) / 6 - widths.degree_one - radial_modes;
+    TORCH_CHECK(adopted == widths.basis ||
+                    (adopted == 48 && channels == 128 && widths.basis == 32),
+                "dpa4c_graph_compress: invalid low-rank radial table shape: "
+                "no compiled scan carries a basis of ",
+                adopted, " functions for ", channels, " channels");
     TORCH_CHECK(payload.basis_table.dim() == 2 &&
                     payload.basis_table.size(0) == payload.table.size(0) &&
                     payload.basis_table.size(1) ==
-                        6 * (widths.degree_one + widths.basis + radial_modes),
+                        6 * (widths.degree_one + adopted + radial_modes),
                 "dpa4c_graph_compress: invalid low-rank radial table shape");
     TORCH_CHECK(
         payload.basis_matrix.sizes() ==
-            torch::IntArrayRef({widths.basis, channels - widths.degree_one}),
+            torch::IntArrayRef({adopted, channels - widths.degree_one}),
         "dpa4c_graph_compress: the low-rank expansion must have "
         "shape (",
-        widths.basis, ", ", channels - widths.degree_one, ")");
+        adopted, ", ", channels - widths.degree_one, ")");
   } else {
     TORCH_CHECK(payload.basis_matrix.numel() == 0,
                 "dpa4c_graph_compress: a low-rank expansion requires its "
@@ -582,6 +638,11 @@ Arguments build_arguments(const Payload& payload,
                             ? payload.edge_mask.data_ptr<bool>()
                             : nullptr;
   arguments.destination_row_ptr = payload.destination_row_ptr.data_ptr<long>();
+  arguments.basis_width =
+      payload.basis_table.numel() != 0
+          ? static_cast<int>(payload.basis_table.size(1)) / 6 -
+                widths.degree_one - radial_modes
+          : 0;
   if (payload.basis_table.numel() != 0) {
     arguments.basis_table = payload.basis_table.data_ptr<float>();
     arguments.basis_matrix = payload.basis_matrix.data_ptr<float>();
@@ -834,7 +895,7 @@ std::tuple<torch::Tensor, torch::Tensor> dpa4c_graph_compress(
   arguments.state_out = state.data_ptr<float>();
   const torch::Tensor node_types =
       canonical ? scan_node_types(atype, arguments, stream) : torch::Tensor();
-  dispatch(channels, false, arguments, stream);
+  dispatch(channels, false, arguments.basis_width, arguments, stream);
   return {descriptor, state};
 }
 
@@ -973,7 +1034,7 @@ dpa4c_graph_compress_backward_impl(torch::Tensor descriptor_gradient,
   const auto stream = at::cuda::getCurrentCUDAStream();
   const torch::Tensor node_types =
       canonical ? scan_node_types(atype, arguments, stream) : torch::Tensor();
-  dispatch(channels, true, arguments, stream);
+  dispatch(channels, true, arguments.basis_width, arguments, stream);
   return {edge_gradient.to(edge_vec.scalar_type()), spin_gradient,
           edge_spin_gradient, pair_energy};
 }
@@ -2846,7 +2907,7 @@ torch::Tensor evaluate_further_blocks(const BlockPass& pass,
     const long count = std::min(run, owned - begin);
     Arguments first = first_arguments(begin, count);
     first.state_out = rows(first_state, begin);
-    dispatch(channels, false, first, stream);
+    dispatch(channels, false, first.basis_width, first, stream);
     BlockArguments maps = block_arguments(first, 0);
     maps.descriptor = first.descriptor;
     dispatch_block(channels, BlockStage::Maps, maps, stream);
@@ -3256,7 +3317,7 @@ dpa4c_canonical_compress_energy_force(
     for (long begin = 0; begin < owned; begin += run) {
       const long count = std::min(run, owned - begin);
       Arguments arguments = first_arguments(begin, count);
-      dispatch(channels, false, arguments, stream);
+      dispatch(channels, false, arguments.basis_width, arguments, stream);
 
       // The cotangent replaces the descriptor, which the run no longer needs.
       runs.output_and_cotangent(
@@ -3269,7 +3330,7 @@ dpa4c_canonical_compress_energy_force(
       arguments.state = state.data_ptr<float>();
       arguments.moment_gradient = state.data_ptr<float>();
       attach_force(arguments, begin, count);
-      dispatch(channels, true, arguments, stream);
+      dispatch(channels, true, arguments.basis_width, arguments, stream);
     }
   }
 
@@ -3707,7 +3768,7 @@ dpa4c_canonical_compress_long_range_energy_force(
         first_block_run(payload, edge_vec_float, channels, widths, node_count,
                         0, node_count, descriptor.data_ptr<float>(),
                         state.data_ptr<float>(), evaluation_words);
-    dispatch(channels, false, arguments, stream);
+    dispatch(channels, false, arguments.basis_width, arguments, stream);
 
     form_cotangent();
 
@@ -3721,7 +3782,7 @@ dpa4c_canonical_compress_long_range_energy_force(
     arguments.edge_gradient =
         atom_virial ? edge_gradient.data_ptr<float>() : nullptr;
     arguments.clear_padding = true;
-    dispatch(channels, true, arguments, stream);
+    dispatch(channels, true, arguments.basis_width, arguments, stream);
   }
 
   // === Step 6. Node results and frame totals ===

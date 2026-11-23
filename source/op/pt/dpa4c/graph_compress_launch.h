@@ -54,6 +54,10 @@ struct Arguments {
   int type_count = 0;
   int table_width = 0;
   int radial_modes = 0;
+  // Basis functions of the adopted low-rank table, zero when the scan reads
+  // the channels directly. The dispatch selects the compiled specialization
+  // of this width; widths without one fail the table-shape check.
+  int basis_width = 0;
   // First node of the launched run within the system. Node-indexed buffers are
   // already offset by the caller; the atom type table is not, because neighbor
   // lookups index it with absolute source indices.
@@ -299,6 +303,14 @@ constexpr int low_rank_basis(int channels) {
   return channels == 64 || channels == 128 ? 32 : 0;
 }
 
+// The basis width a template carries: a negative value derives it from the
+// channel count, as every width-keyed instantiation does; a profile whose
+// weights certify a wider basis passes that width explicitly through the
+// launch chain, and only specializations compiled for it accept its table.
+constexpr int basis_of(int channels, int basis) {
+  return basis < 0 ? low_rank_basis(channels) : basis;
+}
+
 constexpr int degree_rank(int degree, int rank_one, int rank_two) {
   return degree == 1 ? rank_one : (degree == 2 ? rank_two : 1);
 }
@@ -468,7 +480,7 @@ constexpr float kLockstepWindow = 4.0f;
 // ``NodeLanes`` overrides the node-group width; zero selects the narrow
 // candidate. Only the node kernels instantiate the override, so the edge
 // kernels and every existing use of ``Profile`` are unaffected.
-template <int Channels, int Lmax, bool HasSpin, int NodeLanes = 0>
+template <int Channels, int Lmax, bool HasSpin, int NodeLanes = 0, int BasisArg = -1>
 struct Profile {
   static constexpr int C0 = Channels;
   static constexpr int C1 = degree_one_width(Channels);
@@ -477,8 +489,10 @@ struct Profile {
   static constexpr int K2 = 2;
   // Width of the low-rank expansion of the scalar-only channels, zero for a
   // profile whose single-type scan reads the channels directly. The spin
-  // branch never folds, so a spin-conditioned profile carries none.
-  static constexpr int Basis = HasSpin ? 0 : low_rank_basis(Channels);
+  // branch never folds, so a spin-conditioned profile carries none. A
+  // template may pass the width its weights certified instead of the
+  // channel-derived default.
+  static constexpr int Basis = HasSpin ? 0 : basis_of(Channels, BasisArg);
 
   // === Native spin widths ===
   // The neighbour spin width is derived from the degree-two width, so the
@@ -700,9 +714,9 @@ constexpr int slot_resident_warps() {
 /// of the production ``lmax=2`` path. Every width of DPA4C_FOR_EACH_CHANNEL
 /// and every degree from 2 to 4 is instantiated, both directions of a degree
 /// in one generated translation unit (shard.cu.in).
-template <int Channels, int Lmax>
+template <int Channels, int Lmax, int Basis = -1>
 void launch_forward(const Arguments& arguments, cudaStream_t stream);
-template <int Channels, int Lmax>
+template <int Channels, int Lmax, int Basis = -1>
 void launch_backward(const Arguments& arguments, cudaStream_t stream);
 
 }  // namespace deepmd_dpa4c
