@@ -267,6 +267,7 @@ if(USE_CUDA_TOOLKIT AND DEEPMD_TORCH_HAS_CUDA)
     dpa1_graph_compress.cu
     ${DPA1_GRAPH_COMPRESS_KERNEL_SRC}
     ${DPA4C_GRAPH_COMPRESS_KERNEL_SRC}
+    dpa4c/candidate_rows.cu
     graph_fitting.cu
     edge_force_virial.cu
     long_range/direct_sum.cu
