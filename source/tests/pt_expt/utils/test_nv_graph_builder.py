@@ -120,6 +120,79 @@ def test_nv_edge_vec_is_differentiable():
     assert coord.grad is not None and torch.any(coord.grad != 0)
 
 
+@pytest.mark.parametrize("edges", [0, 1, 17])
+def test_direct_canonical_nv_matches_generic_converter(edges: int) -> None:
+    """Keep all seven canonical fields and the small-edge guard ABI."""
+    from dataclasses import (
+        fields,
+    )
+
+    from deepmd.pt_expt.utils.canonical_graph import (
+        canonical_graph_from_pairs,
+    )
+
+    n_node = torch.tensor([4, 4], device="cuda")
+    center = torch.arange(edges, device="cuda") // 3
+    source = torch.arange(edges, device="cuda").flip(0) % 8
+    vectors = torch.arange(edges * 3, device="cuda", dtype=torch.float64).reshape(-1, 3)
+    reference = canonical_graph_from_pairs(center, source, vectors, n_node, 8)
+    actual = nv_builder._canonical_from_ordered_nv(center, source, vectors, n_node, 8)
+    for field in fields(reference):
+        torch.testing.assert_close(
+            getattr(actual, field.name), getattr(reference, field.name), rtol=0, atol=0
+        )
+
+
+@pytest.mark.parametrize(
+    "lower_kind,evaluator,edge_dtype,is_pt2,canonical,expected",
+    [
+        ("dpa_canonical", "dpa4c", "float32", True, True, True),
+        ("dpa_canonical", "dpa45", "float32", True, True, False),
+        ("graph", "dpa4c", "float32", True, True, False),
+        ("dpa_canonical", "dpa4c", "float64", True, True, False),
+        ("dpa_canonical", "dpa4c", "float32", False, True, False),
+        ("dpa_canonical", "dpa4c", "float32", True, False, False),
+    ],
+)
+def test_direct_nv_current_artifact_dispatch(
+    monkeypatch, lower_kind, evaluator, edge_dtype, is_pt2, canonical, expected
+):
+    """Enable direct packing for the current DPA4C archive contract only."""
+    from types import SimpleNamespace
+
+    from deepmd.pt_expt.infer.deep_eval import DeepEval
+
+    evaluator_state = SimpleNamespace(
+        _neighbor_graph_method="nv",
+        _model_pair_excl=lambda: None,
+        _rcut=2.0,
+        _is_pt2=is_pt2,
+        metadata={
+            "lower_input_kind": lower_kind,
+            "canonical_evaluator": evaluator,
+            "graph_edge_dtype": edge_dtype,
+        },
+    )
+    calls = []
+    sentinel = object()
+
+    def build(*args, **kwargs):
+        calls.append(kwargs["_canonical_output"])
+        return sentinel
+
+    monkeypatch.setattr(nv_builder, "build_neighbor_graph_nv", build)
+    result = DeepEval._build_eval_graph(
+        evaluator_state,
+        np.zeros((2, 4, 3)),
+        np.zeros((2, 4), dtype=np.int64),
+        np.repeat(np.eye(3)[None], 2, axis=0),
+        torch.device("cpu"),
+        canonical=canonical,
+    )
+    assert result is sentinel
+    assert calls == [expected]
+
+
 def test_nv_excludes_virtual_atoms_like_dense():
     """Virtual atoms (atype < 0) excluded as center AND neighbor (dense contract)."""
     dev = torch.device("cuda")

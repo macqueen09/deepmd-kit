@@ -49,6 +49,10 @@ from deepmd.pt.utils.nv_nlist import (
 from deepmd.pt.utils.region import (
     normalize_coord,
 )
+from deepmd.pt_expt.utils.canonical_graph import (
+    CanonicalGraph,
+    canonical_index_dtype,
+)
 
 
 def _periodic_edge_vectors(
@@ -270,6 +274,41 @@ def nv_search_matrix(
     return coord, cell, neighbor_matrix, num_neighbors, shifts
 
 
+def _canonical_from_ordered_nv(
+    center: torch.Tensor,
+    source: torch.Tensor,
+    edge_vec: torch.Tensor,
+    n_node: torch.Tensor,
+    node_count: int,
+) -> CanonicalGraph:
+    """Pack the active, destination-major prefix produced by NV decode."""
+    edges = source.numel()
+    bounds = torch.arange(node_count + 1, dtype=torch.int64, device=source.device)
+    destination_row_ptr = torch.searchsorted(center.contiguous(), bounds)
+    source_order = torch.argsort(source, stable=True)
+    source_row_ptr = torch.searchsorted(source.index_select(0, source_order), bounds)
+    source = source.to(canonical_index_dtype(node_count), copy=True)
+    edge_vec = edge_vec.to(torch.float32, copy=True)
+    if edges < 2:
+        source = torch.cat((source, source.new_zeros(2 - edges)))
+        edge_vec = torch.cat((edge_vec, edge_vec.new_zeros((2 - edges, 3))))
+        source_order = torch.cat(
+            (
+                source_order,
+                torch.arange(edges, 2, dtype=torch.int64, device=source.device),
+            )
+        )
+    return CanonicalGraph(
+        n_node=n_node,
+        n_local=n_node,
+        source=source,
+        edge_vec=edge_vec,
+        destination_row_ptr=destination_row_ptr,
+        source_row_ptr=source_row_ptr,
+        source_order=source_order,
+    )
+
+
 def build_neighbor_graph_nv(
     coord: Any,
     atype: Any,
@@ -281,7 +320,8 @@ def build_neighbor_graph_nv(
     canonicalize: bool = False,
     pair_excl: PairExcludeMask | None = None,
     compact: bool = False,
-) -> NeighborGraph:
+    _canonical_output: bool = False,
+) -> NeighborGraph | CanonicalGraph:
     """Build a CARRY-ALL NeighborGraph using nvalchemiops' GPU cell list.
 
     Parameters
@@ -310,6 +350,9 @@ def build_neighbor_graph_nv(
     compact
         Passed to :func:`apply_pair_exclusion`; see that function for details.
         Ignored when ``pair_excl`` is ``None``.
+    _canonical_output
+        Internal frozen DPA4C request for a canonical graph. Unsupported inputs
+        keep the full generic graph and its existing conversion path.
 
     Returns
     -------
@@ -415,6 +458,17 @@ def build_neighbor_graph_nv(
         )
     if pair_excl is not None:
         graph = apply_pair_exclusion(graph, atype_flat, pair_excl, compact=compact)
+    if _canonical_output and fuse_geometry and pair_excl is None and canonicalize:
+        # Decode supplies the active prefix length and already sorts destinations.
+        # Skip generic CSR construction and converter checks of that prefix.
+        edges = src_local.numel()
+        return _canonical_from_ordered_nv(
+            graph.edge_index[1, :edges],
+            graph.edge_index[0, :edges],
+            graph.edge_vec[:edges],
+            n_node,
+            nf * nloc,
+        )
     if with_csr or canonicalize:
         # Matrix slots are decoded in ascending center order; compact filtering
         # preserves that order, whereas an exclusion mask can introduce holes.
