@@ -2653,7 +2653,8 @@ class DeepEval(DeepEvalBackend):
                 _canonical_output=(
                     canonical
                     and self._is_pt2
-                    and self.metadata.get("lower_input_kind") == "dpa4c_canonical"
+                    and self.metadata.get("lower_input_kind") == CANONICAL_LOWER_KIND
+                    and self.metadata.get("canonical_evaluator") == "dpa4c"
                     and self.metadata.get("graph_edge_dtype") == "float32"
                 ),
             )
