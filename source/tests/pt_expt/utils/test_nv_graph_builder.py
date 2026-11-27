@@ -143,6 +143,56 @@ def test_direct_canonical_nv_matches_generic_converter(edges: int) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "lower_kind,evaluator,edge_dtype,is_pt2,canonical,expected",
+    [
+        ("dpa_canonical", "dpa4c", "float32", True, True, True),
+        ("dpa_canonical", "dpa45", "float32", True, True, False),
+        ("graph", "dpa4c", "float32", True, True, False),
+        ("dpa_canonical", "dpa4c", "float64", True, True, False),
+        ("dpa_canonical", "dpa4c", "float32", False, True, False),
+        ("dpa_canonical", "dpa4c", "float32", True, False, False),
+    ],
+)
+def test_direct_nv_current_artifact_dispatch(
+    monkeypatch, lower_kind, evaluator, edge_dtype, is_pt2, canonical, expected
+):
+    """Enable direct packing for the current DPA4C archive contract only."""
+    from types import SimpleNamespace
+
+    from deepmd.pt_expt.infer.deep_eval import DeepEval
+
+    evaluator_state = SimpleNamespace(
+        _neighbor_graph_method="nv",
+        _model_pair_excl=lambda: None,
+        _rcut=2.0,
+        _is_pt2=is_pt2,
+        metadata={
+            "lower_input_kind": lower_kind,
+            "canonical_evaluator": evaluator,
+            "graph_edge_dtype": edge_dtype,
+        },
+    )
+    calls = []
+    sentinel = object()
+
+    def build(*args, **kwargs):
+        calls.append(kwargs["_canonical_output"])
+        return sentinel
+
+    monkeypatch.setattr(nv_builder, "build_neighbor_graph_nv", build)
+    result = DeepEval._build_eval_graph(
+        evaluator_state,
+        np.zeros((2, 4, 3)),
+        np.zeros((2, 4), dtype=np.int64),
+        np.repeat(np.eye(3)[None], 2, axis=0),
+        torch.device("cpu"),
+        canonical=canonical,
+    )
+    assert result is sentinel
+    assert calls == [expected]
+
+
 def test_nv_excludes_virtual_atoms_like_dense():
     """Virtual atoms (atype < 0) excluded as center AND neighbor (dense contract)."""
     dev = torch.device("cuda")
