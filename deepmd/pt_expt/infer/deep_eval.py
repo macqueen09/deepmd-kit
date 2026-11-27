@@ -2302,6 +2302,13 @@ class DeepEval(DeepEvalBackend):
             atom_types = np.tile(atom_types, (nframes, 1))
         else:
             natoms = atom_types.shape[1]
+        # Upload the flat types before the graph builders run. A pageable
+        # host-to-device copy completes only after prior stream work, so
+        # issuing it after graph building stalls the CPU for the whole build;
+        # first, the stream is still idle and the copy overlaps the build.
+        atype_t = torch.as_tensor(
+            atom_types.reshape(-1), dtype=torch.int64, device=DEVICE
+        )
         graph = self._build_eval_graph(
             coords.reshape(nframes, natoms, 3),
             atom_types,
@@ -2309,9 +2316,6 @@ class DeepEval(DeepEvalBackend):
             DEVICE,
             canonical=canonical,
             with_source_csr=with_source_csr,
-        )
-        atype_t = torch.as_tensor(
-            atom_types.reshape(-1), dtype=torch.int64, device=DEVICE
         )
         edge_dtype = (
             torch.float32
@@ -2734,6 +2738,10 @@ class DeepEval(DeepEvalBackend):
                     build_neighbor_graph_vesin,
                 )
 
+                # box_input is the host array whose values bb uploads; hand it
+                # to the builders as the trusted mirror so their cache checks
+                # compare cells on the host instead of synchronizing the GPU.
+                host_bb = box_input.reshape(-1, 3, 3) if box_input is not None else None
                 if pair_excl is None and canonical:
                     return build_canonical_graph_vesin(
                         cc,
@@ -2742,6 +2750,7 @@ class DeepEval(DeepEvalBackend):
                         self._vesin_search,
                         node_mask=aa >= 0 if aa is not None else None,
                         with_source_csr=with_source_csr,
+                        host_box=host_bb,
                     )
                 return build_neighbor_graph_vesin(
                     cc,
@@ -2751,6 +2760,7 @@ class DeepEval(DeepEvalBackend):
                     canonicalize=True,
                     pair_excl=pair_excl,
                     search=self._vesin_search,
+                    host_box=host_bb,
                 )
             from deepmd.pt_expt.utils.nv_graph_builder import (
                 build_neighbor_graph_nv,

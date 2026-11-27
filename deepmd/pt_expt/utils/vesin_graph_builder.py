@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     )
 
 import array_api_compat
+import numpy as np
 import torch
 
 from deepmd.dpmodel.utils.neighbor_graph import (
@@ -62,6 +63,7 @@ def build_neighbor_graph_vesin(
     pair_excl: PairExcludeMask | None = None,
     compact: bool = False,
     search: VesinNeighborSearch | None = None,
+    host_box: np.ndarray | None = None,
 ) -> NeighborGraph:
     """Build a CARRY-ALL NeighborGraph using vesin.torch's O(N) cell list.
 
@@ -96,6 +98,12 @@ def build_neighbor_graph_vesin(
     search
         Optional persistent search shared across evaluations. Its skin only
         controls candidate reuse; the returned graph retains the exact cutoff.
+    host_box
+        Optional host mirror of the values uploaded as ``box``, reshape-
+        compatible with ``(nf, 3, 3)``. Passed frame-by-frame to the search so
+        its cache-invalidation cell comparison runs on the host without a
+        device sync. Must hold the same values as ``box``; None keeps the
+        original GPU comparison.
 
     Returns
     -------
@@ -138,10 +146,21 @@ def build_neighbor_graph_vesin(
         search = VesinNeighborSearch(
             sorted=(with_csr or canonicalize) and torch.device(dev).type != "cuda"
         )
+    host_cells = (
+        np.ascontiguousarray(host_box).reshape(nf, 3, 3)
+        if periodic and host_box is not None
+        else None
+    )
     i_parts, j_parts, S_parts, nf_parts = [], [], [], []
     for f in range(nf):
         cell_f = box[f] if periodic else None
-        ii, jj, ss = search.compute(coord[f], cell_f, rcut, frame=f)
+        ii, jj, ss = search.compute(
+            coord[f],
+            cell_f,
+            rcut,
+            frame=f,
+            host_cell=host_cells[f] if host_cells is not None else None,
+        )
         i_parts.append(ii)
         j_parts.append(jj)
         S_parts.append(ss)
@@ -208,6 +227,7 @@ def build_canonical_graph_vesin(
     node_mask: torch.Tensor | None = None,
     *,
     with_source_csr: bool = True,
+    host_box: np.ndarray | None = None,
 ) -> CanonicalGraph:
     """Build the compact deployment graph directly from Vesin displacements.
 
@@ -229,6 +249,11 @@ def build_canonical_graph_vesin(
         Whether to build the source CSR. ``False`` returns two-entry zero
         placeholders for a DPA4C consumer that declines the per-atom virial;
         the destination CSR, geometry, and node counts are unchanged.
+    host_box : numpy.ndarray, optional
+        Host mirror of the values uploaded as ``box``, reshape-compatible
+        with ``(nf, 3, 3)``. Frame slices feed the search and the candidate
+        row cache so their cell-invalidation comparisons run on the host
+        without a device sync. Must hold the same values as ``box``.
 
     Returns
     -------
@@ -237,6 +262,13 @@ def build_canonical_graph_vesin(
         is detached; this builder serves exported models with explicit forces.
     """
     nf, nloc, _ = coord.shape
+    # 主机晶胞镜像(计划H1): 只在调用者给出可信主机值时启用, 供下方两条
+    # 路径的无同步失效比较; 与 box 逐帧对应。
+    host_cells = (
+        np.ascontiguousarray(host_box).reshape(-1, 3, 3)
+        if box is not None and host_box is not None
+        else None
+    )
     # 候选行热路径(计划C首版): 只服务普通求力的单帧周期 canonical 请求
     # (无逐原子维里 => 无源CSR, 无节点掩码)。原生算子在场且输入满足
     # 契约(FP64 CUDA)才启用; 其余一切情况走下方原路径。
@@ -256,14 +288,15 @@ def build_canonical_graph_vesin(
             candidate_rows_available,
         )
 
+        host_cell0 = host_cells[0] if host_cells is not None else None
         if candidate_rows_available():
             cache = search.candidate_row_cache
             if cache is None or not cache.matches(rcut, search.skin, nloc, coord[0]):
                 cache = CandidateRowCache(rcut, search.skin, nloc)
                 search.candidate_row_cache = cache
-                cache.rebuild(coord[0], box[0])
-            elif not cache.valid_for(coord[0], box[0]):
-                cache.rebuild(coord[0], box[0])
+                cache.rebuild(coord[0], box[0], host_cell=host_cell0)
+            elif not cache.valid_for(coord[0], box[0], host_cell=host_cell0):
+                cache.rebuild(coord[0], box[0], host_cell=host_cell0)
             row_ptr, source, edge_vec = cache.hot(coord[0])
             n_node = torch.full((1,), nloc, dtype=torch.int64, device=coord.device)
             return CanonicalGraph(
@@ -287,6 +320,7 @@ def build_canonical_graph_vesin(
             rcut,
             frame=frame,
             return_vectors=True,
+            host_cell=host_cells[frame] if host_cells is not None else None,
         )
         if node_mask is not None:
             active = node_mask[frame, center] & node_mask[frame, source]
