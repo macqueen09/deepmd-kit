@@ -86,7 +86,10 @@ def test_nv_batches_frames_without_python_loop():
 
 
 @pytest.mark.parametrize("edges", [0, 1, 33, 8192, 8193])
-def test_fused_periodic_geometry_matches_eager_bits(edges: int) -> None:
+@pytest.mark.parametrize("store_fp32", [False, True])
+def test_fused_periodic_geometry_matches_eager_bits(
+    edges: int, store_fp32: bool
+) -> None:
     """Use the original broadcast sum as the independent FP64 reference."""
     generator = torch.Generator(device="cuda").manual_seed(17)
     coord = torch.randn(11, 3, dtype=torch.float64, device="cuda", generator=generator)
@@ -100,10 +103,12 @@ def test_fused_periodic_geometry_matches_eager_bits(edges: int) -> None:
         1
     )
     actual = nv_builder._compiled_periodic_edge_vectors(
-        coord, center, source, shift, cell, frame
+        coord, center, source, shift, cell, frame, store_fp32=store_fp32
     )
-    assert actual.dtype == torch.float64
-    assert torch.equal(actual.view(torch.int64), expected.view(torch.int64))
+    if store_fp32:
+        expected = expected.float()
+    assert actual.dtype == expected.dtype
+    assert torch.equal(actual.view(torch.uint8), expected.view(torch.uint8))
 
 
 def test_nv_edge_vec_is_differentiable():
