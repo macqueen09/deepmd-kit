@@ -154,12 +154,12 @@ constexpr bool foldable() {
 /// few types: a spin-free profile whose single-type scans fold and that
 /// carries radial modes or admits a low-rank table, or a canonical spin
 /// profile of thirty-two channels or more that carries radial modes.
-template <int Channels, bool HasModes, bool HasSpin, bool Canonical>
+template <int Channels, bool HasModes, bool HasSpin, bool Canonical, int Basis = -1>
 constexpr bool slottable() {
   if constexpr (HasSpin) {
     return HasModes && Canonical && Channels >= 32;
   } else {
-    return (HasModes || low_rank_basis(Channels) > 0) &&
+    return (HasModes || basis_of(Channels, Basis) > 0) &&
            foldable<Channels, HasSpin, Canonical>();
   }
 }
@@ -376,11 +376,22 @@ template <int Channels,
           bool Canonical,
           bool Backward,
           Scan Fold,
-          int Slots>
+          int Slots,
+          int Basis = -1>
 constexpr bool runs_slotted() {
-  return slottable<Channels, HasModes, HasSpin, Canonical>() &&
-         (HasModes || Fold == Scan::LowRank) &&
-         (Slots <= 4 || HasModes || !Backward);
+  if constexpr (Fold == Scan::LowRank &&
+                basis_of(Channels, Basis) != kWarpSize) {
+    // A low-rank table wider than a warp has no slotted low-rank scan: its
+    // single-type rows take the folded scan of the plain kernel, whose other
+    // rows scan pairwise, and the systems of a few types keep the slotted
+    // scans of the mode profiles, which read the radial table.
+    return runs_slotted<Channels, HasModes, HasSpin, Canonical, Backward,
+                        Scan::Direct, Slots, Basis>();
+  } else {
+    return slottable<Channels, HasModes, HasSpin, Canonical, Basis>() &&
+           (HasModes || Fold == Scan::LowRank) &&
+           (Slots <= 4 || HasModes || !Backward);
+  }
 }
 
 /// Whether the edge kernel of folded scan `Fold` of direction `Backward`
@@ -391,10 +402,12 @@ template <int Channels,
           bool HasSpin,
           bool Canonical,
           bool Backward,
-          Scan Fold>
+          Scan Fold,
+          int Basis = -1>
 constexpr bool shares_launch() {
-  return slots_types(Fold) || runs_slotted<Channels, HasModes, HasSpin,
-                                           Canonical, Backward, Fold, 4>();
+  return slots_types(Fold) ||
+         runs_slotted<Channels, HasModes, HasSpin, Canonical, Backward, Fold, 4,
+                      Basis>();
 }
 
 /// Whether the edge kernel of folded scan `Fold` of direction `Backward`
@@ -406,13 +419,14 @@ template <int Channels,
           bool HasSpin,
           bool Canonical,
           bool Backward,
-          Scan Fold>
+          Scan Fold,
+          int Basis = -1>
 __device__ __forceinline__ bool serves_system(const Arguments& args) {
   if constexpr (slots_types(Fold)) {
     return holds_types(args, fewest_types<HasSpin>(Fold), type_slots(Fold));
   } else {
     constexpr int Most = runs_slotted<Channels, HasModes, HasSpin, Canonical,
-                                      Backward, Fold, 8>()
+                                      Backward, Fold, 8, Basis>()
                              ? type_slots(Scan::Slotted8)
                              : type_slots(Scan::Slotted4);
     return !holds_types(args, fewest_types<HasSpin>(Scan::Slotted4), Most);
@@ -421,9 +435,9 @@ __device__ __forceinline__ bool serves_system(const Arguments& args) {
 
 /// Whether the edge kernels of a profile run the low-rank single-type scan
 /// for a descriptor that carries the low-rank table.
-template <int Channels, int Lmax, bool HasSpin, bool Canonical>
+template <int Channels, int Lmax, bool HasSpin, bool Canonical, int Basis = -1>
 constexpr bool folds_low_rank() {
-  return Profile<Channels, Lmax, HasSpin>::Basis > 0 &&
+  return Profile<Channels, Lmax, HasSpin, 0, Basis>::Basis > 0 &&
          foldable<Channels, HasSpin, Canonical>();
 }
 
@@ -437,27 +451,34 @@ template <int Channels,
           bool HasSpin,
           bool Canonical,
           bool Backward,
-          Scan Fold>
+          Scan Fold,
+          int Basis = -1>
 __device__ __forceinline__ void enter_edge_scan(const Arguments& args) {
   static_assert(Fold != Scan::Pairwise &&
                     (!reads_low_rank(Fold) ||
-                     folds_low_rank<Channels, Lmax, HasSpin, Canonical>()) &&
+                     folds_low_rank<Channels, Lmax, HasSpin, Canonical,
+                                    Basis>()) &&
                     (!slots_types(Fold) || slots_basis(Fold) || HasModes),
                 "the folded scan of a kernel is a single-type or a slotted "
                 "scan, reads the low-rank table only where it folds, and "
                 "slots the radial table for the mode profiles");
   if constexpr (shares_launch<Channels, HasModes, HasSpin, Canonical, Backward,
-                              Fold>()) {
+                              Fold, Basis>()) {
     retire_unless(
-        serves_system<Channels, HasModes, HasSpin, Canonical, Backward, Fold>(
-            args));
+        serves_system<Channels, HasModes, HasSpin, Canonical, Backward, Fold,
+                      Basis>(args));
   }
 }
 
 /// Run `launch` with the single-type scan of the descriptor in `args`.
-template <int Channels, int Lmax, bool HasSpin, bool Canonical, typename Launch>
-void dispatch_fold(const Arguments& args, Launch&& launch) {
-  if constexpr (folds_low_rank<Channels, Lmax, HasSpin, Canonical>()) {
+template <int Channels,
+          int Lmax,
+          bool HasSpin,
+          bool Canonical,
+          typename Launch,
+          int Basis = -1>
+void dispatch_fold(const Arguments& args, Launch launch) {
+  if constexpr (folds_low_rank<Channels, Lmax, HasSpin, Canonical, Basis>()) {
     if (args.basis_table != nullptr) {
       launch(ScanTag<Scan::LowRank>{});
       return;
@@ -983,15 +1004,15 @@ template <int Channels,
           typename index_t,
           int Warps,
           int Split,
-          Scan Fold>
+          Scan Fold, int Basis = -1>
 __global__ __launch_bounds__(
     Warps * Split * kWarpSize,
     (slots_types(Fold)
          ? slot_resident_warps<HasModes, windowed<Warps>() ? Warps : 0>()
          : edge_resident_blocks<Channels, Lmax, HasModes, HasSpin, false>()) /
         (Warps * Split)) void forward_kernel(Arguments args) {
-  using P = Profile<Channels, Lmax, HasSpin>;
-  enter_edge_scan<Channels, Lmax, HasModes, HasSpin, Canonical, false, Fold>(
+  using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
+  enter_edge_scan<Channels, Lmax, HasModes, HasSpin, Canonical, false, Fold, Basis>(
       args);
   constexpr bool SlotScan = slots_types(Fold);
   constexpr int EdgeWidth = P::ForwardEdgeWidth;
@@ -1085,7 +1106,7 @@ __global__ __launch_bounds__(
   // A slotted scan accumulates the mode profiles and the basis functions of
   // the edges of each node type of its system in the slot of that type.
   static_assert(
-      !SlotScan || slottable<Channels, HasModes, HasSpin, Canonical>(),
+      !SlotScan || slottable<Channels, HasModes, HasSpin, Canonical, Basis>(),
       "a slotted scan serves a profile that slots");
   constexpr bool SlotModes = SlotScan && HasModes;
   constexpr bool SlotBasis = slots_basis(Fold);
@@ -1922,10 +1943,10 @@ __global__ __launch_bounds__(
 // whose capacity follows the carveout the scan's shared memory selects; the
 // readout buffers of a resident node would double that carveout at full
 // occupancy.
-template <int Channels, int Lmax, bool HasSpin>
+template <int Channels, int Lmax, bool HasSpin, int Basis = -1>
 __global__ __launch_bounds__(kWarpSize) void forward_readout_kernel(
     Arguments args) {
-  using P = Profile<Channels, Lmax, HasSpin>;
+  using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
   const int thread = threadIdx.x;
   const long node = blockIdx.x;
   if (node >= args.node_count) {
@@ -2233,14 +2254,14 @@ __global__ __launch_bounds__(kWarpSize) void forward_readout_kernel(
 // Their gradients need only Q0^2, Q1^2, and the symmetrized Q0 Q1 product, so
 // evaluating this closed form inside the node backward avoids a second probe
 // projection and the associated global gradient checkpoint.
-template <int Channels, int Lmax, bool HasSpin>
+template <int Channels, int Lmax, bool HasSpin, int Basis = -1>
 __device__ __forceinline__ void add_bis222_probe_gradient(
     int lane,
     long node,
     const Arguments& args,
     const float* __restrict__ probes,
     float (&d_tensor)[5]) {
-  using P = Profile<Channels, Lmax, HasSpin>;
+  using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
   float packed_0[5];
   float packed_1[5];
 #pragma unroll
@@ -2307,11 +2328,11 @@ __device__ __forceinline__ void add_bis222_probe_gradient(
 // Index of one coupling operand among the targets of the coupling VJP: the
 // probe layout for degrees one and two, followed by the single-channel high
 // degrees in the order of the moment layout.
-template <int Channels, int Lmax, bool HasSpin>
+template <int Channels, int Lmax, bool HasSpin, int Basis = -1>
 __device__ __forceinline__ int coupling_target(int degree,
                                                int component,
                                                int rank_index) {
-  using P = Profile<Channels, Lmax, HasSpin>;
+  using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
   if (degree == 1) {
     return component * P::K1 + rank_index;
   }
@@ -2329,7 +2350,7 @@ __device__ __forceinline__ int coupling_target(int degree,
 // the result is deterministic while no lane walks more than its share of the
 // pairs. Equal degrees occupy several operand slots of one record and receive
 // one contribution per slot.
-template <int Channels, int Lmax, bool HasSpin, int NodeLanes>
+template <int Channels, int Lmax, bool HasSpin, int NodeLanes, int Basis = -1>
 __device__ __forceinline__ void coupling_gradient(
     int lane,
     long node,
@@ -2338,7 +2359,7 @@ __device__ __forceinline__ void coupling_gradient(
     const float* __restrict__ moments,
     float* __restrict__ rows,
     float* __restrict__ total) {
-  using P = Profile<Channels, Lmax, HasSpin, NodeLanes>;
+  using P = Profile<Channels, Lmax, HasSpin, NodeLanes, Basis>;
   constexpr int Width = P::NodeWidth;
   constexpr int Targets = P::ProbeWidth + P::HighCount;
   float* row = rows + lane * Targets;
@@ -2405,11 +2426,11 @@ __device__ __forceinline__ void coupling_gradient(
 // Four independent lane groups share one warp. An incomplete final block
 // aliases inactive groups to the last valid node so every thread reaches each
 // block-wide barrier; stores from those groups are suppressed.
-template <int Channels, int Lmax, bool HasSpin, int NodeLanes>
+template <int Channels, int Lmax, bool HasSpin, int NodeLanes, int Basis = -1>
 __global__ __launch_bounds__(
-    Profile<Channels, Lmax, HasSpin, NodeLanes>::Threads,
+    Profile<Channels, Lmax, HasSpin, NodeLanes, Basis>::Threads,
     2) void node_backward_kernel(Arguments args) {
-  using P = Profile<Channels, Lmax, HasSpin, NodeLanes>;
+  using P = Profile<Channels, Lmax, HasSpin, NodeLanes, Basis>;
   const int thread = threadIdx.x;
   const int group = thread / P::NodeWidth;
   const int lane = thread & (P::NodeWidth - 1);
@@ -2991,15 +3012,15 @@ template <int Channels,
           typename index_t,
           int Warps,
           int Split,
-          Scan Fold>
+          Scan Fold, int Basis = -1>
 __global__ __launch_bounds__(
     Warps * Split * kWarpSize,
     (slots_types(Fold)
          ? slot_resident_warps<HasModes, windowed<Warps>() ? Warps : 0>()
          : edge_resident_blocks<Channels, Lmax, HasModes, HasSpin, true>()) /
         (Warps * Split)) void edge_backward_kernel(Arguments args) {
-  using P = Profile<Channels, Lmax, HasSpin>;
-  enter_edge_scan<Channels, Lmax, HasModes, HasSpin, Canonical, true, Fold>(
+  using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
+  enter_edge_scan<Channels, Lmax, HasModes, HasSpin, Canonical, true, Fold, Basis>(
       args);
   constexpr bool SlotScan = slots_types(Fold);
   constexpr int EdgeWidth = P::BackwardEdgeWidth;
@@ -3165,7 +3186,7 @@ __global__ __launch_bounds__(
   // A slotted scan reads the cotangents of the mode profiles and of the basis
   // functions of the slot of the source type of every edge.
   static_assert(
-      !SlotScan || slottable<Channels, HasModes, HasSpin, Canonical>(),
+      !SlotScan || slottable<Channels, HasModes, HasSpin, Canonical, Basis>(),
       "a slotted scan serves a profile that slots");
   constexpr bool SlotModes = SlotScan && HasModes;
   constexpr bool SlotBasis = slots_basis(Fold);
@@ -4266,9 +4287,10 @@ template <class Family,
           int Lmax,
           bool HasSpin,
           bool Canonical,
-          typename index_t>
+          typename index_t,
+          int Basis = -1>
 void launch_edge_scans(const Arguments& args, cudaStream_t stream) {
-  dispatch_fold<Channels, Lmax, HasSpin, Canonical>(args, [&](auto fold) {
+  const auto scan_launcher = [&](auto fold) {
     constexpr Scan Fold = decltype(fold)::value;
     constexpr int Warps =
         coscheduled_warps<Channels, Lmax, HasSpin, Canonical, Backward>();
@@ -4277,18 +4299,23 @@ void launch_edge_scans(const Arguments& args, cudaStream_t stream) {
                        index_t>(args, stream);
     }
     Family::template launch_slots<Fold>(args, stream);
-  });
+  };
+  dispatch_fold<Channels, Lmax, HasSpin, Canonical, decltype(scan_launcher),
+                Basis>(args, scan_launcher);
 }
 
 /// The slotted scan of `Slots` slots of a descriptor whose single-type scan
 /// is `Fold`: the one that slots the basis functions of its low-rank table,
 /// or the one that reads the radial table.
-template <Scan Fold, int Slots>
+template <Scan Fold, int Slots, bool Wide = false>
 constexpr Scan slotted_scan() {
+  // A low-rank table wider than a warp has no slotted low-rank scan, so its
+  // launch carries the slotted scans of the radial table.
+  constexpr bool low_rank = Fold == Scan::LowRank && !Wide;
   if constexpr (Slots > 4) {
-    return Fold == Scan::LowRank ? Scan::SlottedLowRank8 : Scan::Slotted8;
+    return low_rank ? Scan::SlottedLowRank8 : Scan::Slotted8;
   } else {
-    return Fold == Scan::LowRank ? Scan::SlottedLowRank4 : Scan::Slotted4;
+    return low_rank ? Scan::SlottedLowRank4 : Scan::Slotted4;
   }
 }
 
@@ -4325,7 +4352,7 @@ template <int Channels,
           bool HasSpin,
           bool Bridged,
           bool Canonical,
-          typename index_t>
+          typename index_t, int Basis = -1>
 struct ForwardLauncher {
   template <int Warps, int Split, Scan Fold>
   static constexpr auto kernel = forward_kernel<Channels,
@@ -4337,28 +4364,29 @@ struct ForwardLauncher {
                                                 index_t,
                                                 Warps,
                                                 Split,
-                                                Fold>;
+                                                Fold,
+                                                Basis>;
 
   /// Launch the slotted forward scans of a descriptor whose single-type
   /// scan is `Fold` (see `runs_slotted`).
   template <Scan Fold>
   static void launch_slots(const Arguments& args, cudaStream_t stream) {
     if constexpr (runs_slotted<Channels, HasModes, HasSpin, Canonical, false,
-                               Fold, 4>()) {
+                               Fold, 4, Basis>()) {
       launch_slot_scans<ForwardLauncher, false, Channels, Lmax, HasSpin,
-                        Canonical, index_t, slotted_scan<Fold, 4>()>(args,
+                        Canonical, index_t, slotted_scan<Fold, 4, basis_of(Channels, Basis) != kWarpSize>()>(args,
                                                                      stream);
     }
     if constexpr (runs_slotted<Channels, HasModes, HasSpin, Canonical, false,
-                               Fold, 8>()) {
+                               Fold, 8, Basis>()) {
       launch_slot_scans<ForwardLauncher, false, Channels, Lmax, HasSpin,
-                        Canonical, index_t, slotted_scan<Fold, 8>()>(args,
+                        Canonical, index_t, slotted_scan<Fold, 8, basis_of(Channels, Basis) != kWarpSize>()>(args,
                                                                      stream);
     }
   }
 
   static void run(const Arguments& args, cudaStream_t stream) {
-    using P = Profile<Channels, Lmax, HasSpin>;
+    using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
     launch_edge_scans<ForwardLauncher, false, Channels, Lmax, HasSpin,
                       Canonical, index_t>(args, stream);
     forward_readout_kernel<Channels, Lmax, HasSpin>
@@ -4372,7 +4400,7 @@ template <int Channels,
           bool HasSpin,
           bool Bridged,
           bool Canonical,
-          typename index_t>
+          typename index_t, int Basis = -1>
 struct BackwardLauncher {
   // Pick the node-group width from what the running device grants the two
   // compiled kernels rather than from its architecture: the six shared arrays
@@ -4392,20 +4420,20 @@ struct BackwardLauncher {
   static bool prefer_wide_nodes() {
     static DeviceMemo preferences;
     return preferences.get([](int device) {
-      using Narrow = Profile<Channels, Lmax, HasSpin, kNodeLanesNarrow>;
-      using Wide = Profile<Channels, Lmax, HasSpin, kNodeLanesWide>;
+      using Narrow = Profile<Channels, Lmax, HasSpin, kNodeLanesNarrow, Basis>;
+      using Wide = Profile<Channels, Lmax, HasSpin, kNodeLanesWide, Basis>;
       int narrow_blocks = 0;
       int wide_blocks = 0;
       check_query(
           cudaOccupancyMaxActiveBlocksPerMultiprocessor(
               &narrow_blocks,
-              node_backward_kernel<Channels, Lmax, HasSpin, kNodeLanesNarrow>,
+              node_backward_kernel<Channels, Lmax, HasSpin, kNodeLanesNarrow, Basis>,
               Narrow::Threads, 0),
           "the occupancy query of the node backward");
       check_query(
           cudaOccupancyMaxActiveBlocksPerMultiprocessor(
               &wide_blocks,
-              node_backward_kernel<Channels, Lmax, HasSpin, kNodeLanesWide>,
+              node_backward_kernel<Channels, Lmax, HasSpin, kNodeLanesWide, Basis>,
               Wide::Threads, 0),
           "the occupancy query of the node backward");
       int threads_per_sm = 0;
@@ -4430,33 +4458,34 @@ struct BackwardLauncher {
                                                       index_t,
                                                       Warps,
                                                       Split,
-                                                      Fold>;
+                                                      Fold,
+                                                Basis>;
 
   /// Launch the slotted edge backwards of a descriptor whose single-type
   /// scan is `Fold` (see `runs_slotted`).
   template <Scan Fold>
   static void launch_slots(const Arguments& args, cudaStream_t stream) {
     if constexpr (runs_slotted<Channels, HasModes, HasSpin, Canonical, true,
-                               Fold, 4>()) {
+                               Fold, 4, Basis>()) {
       launch_slot_scans<BackwardLauncher, true, Channels, Lmax, HasSpin,
-                        Canonical, index_t, slotted_scan<Fold, 4>()>(args,
+                        Canonical, index_t, slotted_scan<Fold, 4, basis_of(Channels, Basis) != kWarpSize>()>(args,
                                                                      stream);
     }
     if constexpr (runs_slotted<Channels, HasModes, HasSpin, Canonical, true,
-                               Fold, 8>()) {
+                               Fold, 8, Basis>()) {
       launch_slot_scans<BackwardLauncher, true, Channels, Lmax, HasSpin,
-                        Canonical, index_t, slotted_scan<Fold, 8>()>(args,
+                        Canonical, index_t, slotted_scan<Fold, 8, basis_of(Channels, Basis) != kWarpSize>()>(args,
                                                                      stream);
     }
   }
 
   template <int NodeLanes>
   static void launch_node_backward(const Arguments& args, cudaStream_t stream) {
-    using NodeProfile = Profile<Channels, Lmax, HasSpin, NodeLanes>;
+    using NodeProfile = Profile<Channels, Lmax, HasSpin, NodeLanes, Basis>;
     const int node_blocks =
         static_cast<int>((args.node_count + NodeProfile::NodeGroups - 1) /
                          NodeProfile::NodeGroups);
-    node_backward_kernel<Channels, Lmax, HasSpin, NodeLanes>
+    node_backward_kernel<Channels, Lmax, HasSpin, NodeLanes, Basis>
         <<<node_blocks, NodeProfile::Threads, 0, stream>>>(args);
   }
 
@@ -4505,23 +4534,24 @@ template <int Channels,
           bool HasModes,
           bool HasSpin,
           bool Bridged,
-          template <int, int, bool, bool, bool, bool, typename> class L>
+          template <int, int, bool, bool, bool, bool, typename, int> class L,
+          int Basis = -1>
 void dispatch_topology(const Arguments& args, cudaStream_t stream) {
   const bool wide = args.index_kind == IndexKind::Bits64;
   if (args.canonical) {
     if (wide) {
-      L<Channels, Lmax, HasModes, HasSpin, Bridged, true, long>::run(args,
+      L<Channels, Lmax, HasModes, HasSpin, Bridged, true, long, Basis>::run(args,
                                                                      stream);
     } else {
-      L<Channels, Lmax, HasModes, HasSpin, Bridged, true, std::uint32_t>::run(
+      L<Channels, Lmax, HasModes, HasSpin, Bridged, true, std::uint32_t, Basis>::run(
           args, stream);
     }
   } else {
     if (wide) {
-      L<Channels, Lmax, HasModes, HasSpin, Bridged, false, long>::run(args,
+      L<Channels, Lmax, HasModes, HasSpin, Bridged, false, long, Basis>::run(args,
                                                                       stream);
     } else {
-      L<Channels, Lmax, HasModes, HasSpin, Bridged, false, std::uint32_t>::run(
+      L<Channels, Lmax, HasModes, HasSpin, Bridged, false, std::uint32_t, Basis>::run(
           args, stream);
     }
   }
@@ -4535,13 +4565,15 @@ template <int Channels,
           int Lmax,
           bool HasModes,
           bool HasSpin,
-          template <int, int, bool, bool, bool, bool, typename> class L>
+          template <int, int, bool, bool, bool, bool, typename, int> class L,
+          int Basis = -1>
 void dispatch_bridging(const Arguments& args, cudaStream_t stream) {
   if (args.bridged) {
-    dispatch_topology<Channels, Lmax, HasModes, HasSpin, true, L>(args, stream);
+    dispatch_topology<Channels, Lmax, HasModes, HasSpin, true, L, Basis>(
+        args, stream);
   } else {
-    dispatch_topology<Channels, Lmax, HasModes, HasSpin, false, L>(args,
-                                                                   stream);
+    dispatch_topology<Channels, Lmax, HasModes, HasSpin, false, L, Basis>(
+        args, stream);
   }
 }
 
@@ -4553,12 +4585,14 @@ void dispatch_bridging(const Arguments& args, cudaStream_t stream) {
 template <int Channels,
           int Lmax,
           bool HasModes,
-          template <int, int, bool, bool, bool, bool, typename> class L>
+          template <int, int, bool, bool, bool, bool, typename, int> class L,
+          int Basis = -1>
 void dispatch_spin(const Arguments& args, cudaStream_t stream) {
   if (args.has_spin) {
-    dispatch_bridging<Channels, Lmax, HasModes, true, L>(args, stream);
+    dispatch_bridging<Channels, Lmax, HasModes, true, L, Basis>(args, stream);
   } else {
-    dispatch_bridging<Channels, Lmax, HasModes, false, L>(args, stream);
+    dispatch_bridging<Channels, Lmax, HasModes, false, L, Basis>(
+        args, stream);
   }
 }
 
@@ -4567,23 +4601,24 @@ void dispatch_spin(const Arguments& args, cudaStream_t stream) {
 // vector temporaries and the shared profile cache of one that has them.
 template <int Channels,
           int Lmax,
-          template <int, int, bool, bool, bool, bool, typename> class L>
+          template <int, int, bool, bool, bool, bool, typename, int> class L,
+          int Basis = -1>
 void dispatch_modes(const Arguments& args, cudaStream_t stream) {
   if (args.radial_modes > 0) {
-    dispatch_spin<Channels, Lmax, true, L>(args, stream);
+    dispatch_spin<Channels, Lmax, true, L, Basis>(args, stream);
   } else {
-    dispatch_spin<Channels, Lmax, false, L>(args, stream);
+    dispatch_spin<Channels, Lmax, false, L, Basis>(args, stream);
   }
 }
 
-template <int Channels, int Lmax>
+template <int Channels, int Lmax, int Basis>
 void launch_forward(const Arguments& arguments, cudaStream_t stream) {
-  dispatch_modes<Channels, Lmax, ForwardLauncher>(arguments, stream);
+  dispatch_modes<Channels, Lmax, ForwardLauncher, Basis>(arguments, stream);
 }
 
-template <int Channels, int Lmax>
+template <int Channels, int Lmax, int Basis>
 void launch_backward(const Arguments& arguments, cudaStream_t stream) {
-  dispatch_modes<Channels, Lmax, BackwardLauncher>(arguments, stream);
+  dispatch_modes<Channels, Lmax, BackwardLauncher, Basis>(arguments, stream);
 }
 
 // The stages of the first block that a descriptor of several blocks launches
@@ -4594,10 +4629,10 @@ template <int Channels,
           bool HasSpin,
           bool Bridged,
           bool Canonical,
-          typename index_t>
+          typename index_t, int Basis = -1>
 struct ReadoutLauncher {
   static void run(const Arguments& args, cudaStream_t stream) {
-    using P = Profile<Channels, Lmax, HasSpin>;
+    using P = Profile<Channels, Lmax, HasSpin, 0, Basis>;
     forward_readout_kernel<Channels, Lmax, HasSpin>
         <<<static_cast<int>(args.node_count), P::Threads, 0, stream>>>(args);
   }
@@ -4609,11 +4644,12 @@ template <int Channels,
           bool HasSpin,
           bool Bridged,
           bool Canonical,
-          typename index_t>
+          typename index_t,
+          int Basis = -1>
 struct NodeBackwardLauncher {
   static void run(const Arguments& args, cudaStream_t stream) {
     BackwardLauncher<Channels, Lmax, HasModes, HasSpin, Bridged, Canonical,
-                     index_t>::run_nodes(args, stream);
+                     index_t, Basis>::run_nodes(args, stream);
   }
 };
 
@@ -4623,11 +4659,12 @@ template <int Channels,
           bool HasSpin,
           bool Bridged,
           bool Canonical,
-          typename index_t>
+          typename index_t,
+          int Basis = -1>
 struct EdgeBackwardLauncher {
   static void run(const Arguments& args, cudaStream_t stream) {
     BackwardLauncher<Channels, Lmax, HasModes, HasSpin, Bridged, Canonical,
-                     index_t>::run_edges(args, stream);
+                     index_t, Basis>::run_edges(args, stream);
   }
 };
 
@@ -4643,10 +4680,12 @@ void launch_first_stage(FirstStage stage,
       dispatch_modes<Channels, Lmax, ReadoutLauncher>(arguments, stream);
       return;
     case FirstStage::NodeBackward:
-      dispatch_modes<Channels, Lmax, NodeBackwardLauncher>(arguments, stream);
+      dispatch_modes<Channels, Lmax, NodeBackwardLauncher>(arguments,
+                                                           stream);
       return;
     case FirstStage::EdgeBackward:
-      dispatch_modes<Channels, Lmax, EdgeBackwardLauncher>(arguments, stream);
+      dispatch_modes<Channels, Lmax, EdgeBackwardLauncher>(arguments,
+                                                           stream);
       return;
   }
 }

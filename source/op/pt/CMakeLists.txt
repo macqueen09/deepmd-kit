@@ -182,7 +182,7 @@ if(USE_CUDA_TOOLKIT AND DEEPMD_TORCH_HAS_CUDA)
   # compressed as one, takes about a third of the size of three. The widths are
   # those of DPA4C_FOR_EACH_CHANNEL and the degrees those that
   # dpa4c/graph_compress.cu dispatches.
-  set(DPA4C_GRAPH_COMPRESS_KERNEL_SRC dpa4c/graph_compress.cu)
+  set(DPA4C_GRAPH_COMPRESS_KERNEL_SRC dpa4c/graph_compress.cu dpa4c/lowrank_wide.cu)
   set(DPA4C_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/dpa4c")
   set(DPA4C_KERNEL_HEADER
       "${CMAKE_CURRENT_SOURCE_DIR}/dpa4c/graph_compress_kernel.cuh")

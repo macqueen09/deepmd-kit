@@ -158,9 +158,25 @@ _LOW_RANK_TOLERANCE = 1.0e-8
 # so that a channel value and its change over this length weigh alike.
 _LOW_RANK_SLOPE_LENGTH = 1.0
 
-# Width of the low-rank expansion per channel count, mirroring
-# ``low_rank_basis`` on the device side; absent widths admit none.
-_LOW_RANK_BASIS = {64: 32, 128: 32}
+# Candidate widths of the low-rank expansion per channel count and angular
+# degree, tried in order at table build; the first one whose basis reproduces
+# the channels is adopted, and none certifying keeps the direct scan. The
+# first width of every profile is the one its native launchers derive from
+# the channel count (`low_rank_basis` on the device side). The released
+# weights of the Plus grade, of one hundred twenty-eight channels and angular
+# degree three, need more than the historical rank of thirty-two functions, so
+# that profile alone lists a wider basis ahead: forty-eight functions, a
+# multiple of every edge-group width of the profile, which the device side
+# compiles for that degree alone (`lowrank_wide.cu`). A profile or degree
+# outside the table admits none.
+_LOW_RANK_BASIS = {
+    (64, 2): (32,),
+    (64, 3): (32,),
+    (64, 4): (32,),
+    (128, 2): (32,),
+    (128, 3): (32, 48),
+    (128, 4): (32,),
+}
 
 # Mode profiles a folded single-type scan carries, mirroring ``kFoldedModes``
 # on the device side. A descriptor with more modes scans unfolded and never
@@ -400,7 +416,11 @@ def descriptor_profile(
         spin_channels=spin_channels,
         spin_width=spin_dim,
         # The spin branch never scans folded, so it carries no expansion.
-        basis=0 if has_spin else _LOW_RANK_BASIS.get(int(channels), 0),
+        basis=(
+            0
+            if has_spin
+            else max(_LOW_RANK_BASIS.get((int(channels), int(lmax)), (0,)))
+        ),
     )
 
 
@@ -824,6 +844,15 @@ def build_low_rank_table(
             torch.empty(0, dtype=torch.float32, device=device),
         )
 
+    candidates = _LOW_RANK_BASIS.get((int(profile.channels), int(profile.lmax)), ())
+    # A descriptor of several message-passing blocks runs its first block in
+    # stages and its further blocks through launches that carry the
+    # channel-derived width alone, so it tries that width and keeps the
+    # direct scan when it does not reproduce the channels.
+    if descriptor.attentions:
+        candidates = candidates[:1]
+    # The spin branch admits no basis (`profile.basis` is zero), and neither
+    # does a descriptor whose single-type scans unfold.
     if profile.basis == 0 or int(descriptor.radial_modes) > _FOLDED_MODES:
         return empty()
     values, first, second = (
@@ -836,6 +865,8 @@ def build_low_rank_table(
     slope_scale = first[:, scalar].abs().amax(0)
 
     # === Step 1. Leading singular subspace of the scaled channels ===
+    # The decomposition is shared by every candidate width; a candidate only
+    # slices its own leading block of it.
     samples = (
         torch.cat(
             [values[:, scalar], first[:, scalar] * _LOW_RANK_SLOPE_LENGTH],
@@ -843,47 +874,52 @@ def build_low_rank_table(
         )
         / value_scale
     )
-    if samples.shape[0] <= profile.basis or not bool(torch.isfinite(samples).all()):
+    if not bool(torch.isfinite(samples).all()):
         return empty()
     _, _, right = torch.linalg.svd(samples, full_matrices=False)
-    # Rows of ``right`` follow decreasing singular values; the flip stores the
-    # basis in increasing order.
-    subspace = right[: profile.basis].flip(0).T
-    expansion = value_scale[:, None] * subspace
 
-    def project(knot_data: torch.Tensor) -> torch.Tensor:
-        return (knot_data[:, scalar] / value_scale) @ subspace
+    # === Step 2. Adopt the first candidate that reproduces every channel ===
+    for width in candidates:
+        if samples.shape[0] <= width:
+            continue
+        # Rows of ``right`` follow decreasing singular values; the flip stores
+        # the basis in increasing order.
+        subspace = right[:width].flip(0).T
+        expansion = value_scale[:, None] * subspace
 
-    basis_values = project(values)
-    basis_first = project(first)
-    basis_second = project(second)
+        def project(knot_data: torch.Tensor) -> torch.Tensor:
+            return (knot_data[:, scalar] / value_scale) @ subspace
 
-    # === Step 2. Adopt the basis only if it reproduces every channel ===
-    value_error = (basis_values @ expansion.T - values[:, scalar]).abs().amax(0)
-    slope_error = (basis_first @ expansion.T - first[:, scalar]).abs().amax(0)
-    if not bool(
-        (value_error <= _LOW_RANK_TOLERANCE * value_scale).all()
-        and (slope_error <= _LOW_RANK_TOLERANCE * slope_scale).all()
-    ):
-        return empty()
+        basis_values = project(values)
+        basis_first = project(first)
+        basis_second = project(second)
 
-    # === Step 3. Tabulate the degree-one channels, the basis and the modes ===
-    def columns(knot_data: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
-        return torch.cat(
-            [knot_data[:, :split], basis, knot_data[:, profile.channels :]],
-            dim=-1,
+        value_error = (basis_values @ expansion.T - values[:, scalar]).abs().amax(0)
+        slope_error = (basis_first @ expansion.T - first[:, scalar]).abs().amax(0)
+        if not bool(
+            (value_error <= _LOW_RANK_TOLERANCE * value_scale).all()
+            and (slope_error <= _LOW_RANK_TOLERANCE * slope_scale).all()
+        ):
+            continue
+
+        # === Step 3. Tabulate degree-one channels, the basis and the modes ===
+        def columns(knot_data: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
+            return torch.cat(
+                [knot_data[:, :split], basis, knot_data[:, profile.channels :]],
+                dim=-1,
+            )
+
+        table = _quintic_coefficients(
+            columns(values, basis_values),
+            columns(first, basis_first),
+            columns(second, basis_second),
+            float(stride),
         )
-
-    table = _quintic_coefficients(
-        columns(values, basis_values),
-        columns(first, basis_first),
-        columns(second, basis_second),
-        float(stride),
-    )
-    return (
-        table.to(torch.float32).contiguous(),
-        expansion.T.to(torch.float32).contiguous(),
-    )
+        return (
+            table.to(torch.float32).contiguous(),
+            expansion.T.to(torch.float32).contiguous(),
+        )
+    return empty()
 
 
 def build_compression_artifacts(
