@@ -570,6 +570,9 @@ def canonical_graph_from_pairs(
     edge_vec = edge_vec.index_select(0, destination_order).to(torch.float32)
     boundaries = torch.arange(node_count + 1, dtype=torch.int64, device=source.device)
     destination_row_ptr = torch.searchsorted(center, boundaries)
+    # The destination permutation and sorted keys are no longer consumed.
+    # Release their local references before allocating the source sort workspace.
+    del center, destination_order
     source_order = torch.argsort(source, stable=True)
     source_row_ptr = torch.searchsorted(
         source.index_select(0, source_order), boundaries
