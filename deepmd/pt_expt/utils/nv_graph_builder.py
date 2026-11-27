@@ -345,6 +345,9 @@ def build_neighbor_graph_nv(
     center_local, src_local, shift, frame_idx = nv_matrix_to_ijs(
         neighbor_matrix, num_neighbors, shifts, nloc, node_index=node_index
     )
+    # Decoded edges own their storage. Reuse the dense search workspace before
+    # constructing per-edge geometry and CSR temporaries.
+    del neighbor_matrix, num_neighbors, shifts, node_index
 
     graph = neighbor_graph_from_ijs(
         center_local,
